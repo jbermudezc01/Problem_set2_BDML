@@ -30,7 +30,7 @@ p_load(tidyverse, # Manipular dataframes
 
 # cargar base de datos 
 
-bd <- read.csv("~/Desktop/Taller 2 /Stores/bd.csv")
+bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/bd.csv')
 View(bd)
 
 # identificar variables de bd 
@@ -141,9 +141,6 @@ bd <- bd %>%
   mutate(color = case_when(property_type == "Apartamento" ~ "#2A9D8F",
                            property_type == "Casa" ~ "#F4A261"))
 
-# Eliminamos los immuebles con área menor a 20
-bd <- bd %>% filter( surface_covered > 20)
-
 # Encontram,os el queremos que sea el centro del mapa 
 latitud_central <- mean(bd$lat)
 longitud_central <- mean(bd$lon)
@@ -180,22 +177,40 @@ bd <- bd %>%
 # variable parqueadero 
 bd <- bd %>%
   mutate(parqueadero = as.numeric(grepl("parqueadero", description)))
+bd %>%
+  count(parqueadero)
+
 # variable terraza 
   bd <- bd %>%
   mutate(terraza = as.numeric(grepl("terraza|balcon", description, ignore.case = TRUE)))
+  bd %>%
+    count(terraza)
+  
 # variable ascensor 
 bd <- bd %>%
   mutate(ascensor = as.numeric(grepl("ascensor", description)))
+bd %>%
+  count(ascensor)
+bd %>%
+  count(vigilancia)
+
 # variable deposito
 bd <- bd %>%
   mutate(deposito = as.numeric(grepl("bodega|deposito", description, ignore.case = TRUE)))
+bd %>%
+  count(deposito)
+
 # variable vigilancia 
 bd <- bd %>%
   mutate(vigilancia = as.numeric(grepl("vigilancia|porteria", description, ignore.case = TRUE)))
+bd %>%
+  count(vigilancia)
+
 # variable de cocina integral
 bd <- bd %>%
   mutate(cocina_integral = as.numeric(grepl("cocina integral", description)))
-# variable de superficie total 
+bd %>%
+  count(cocina_integral)
 
 
 # creación de variables espaciale #
@@ -239,6 +254,10 @@ mall <-  bogota%>%
 ciclovias <- bogota%>%
   add_osm_feature(key = "highway", value= "cycleway")%>%
   osmdata_sf()
+# centro urbanos de servicios
+centro_servicios <- bogota %>%
+  add_osm_feature(key = "landuse", value= "commercial")%>%
+  osmdata_sf()
 
 # visulizar su localización 
 
@@ -259,6 +278,9 @@ head(puntos_mall)
 #ciclovia
 puntos_ciclovia <- ciclovias$osm_points
 head(puntos_ciclovia)
+# centros_servicios
+puntos_servicios <- centro_servicios$osm_points
+head(puntos_servicios)
 
 # crear grafico de localización 
 
@@ -282,6 +304,10 @@ ggplot()+
 ggplot()+
   geom_sf(data=puntos_ciclovia)+
   theme_bw()
+#servicios
+ggplot()+
+  geom_sf(data=puntos_servicios)+
+  theme_bw()
 
 # rescatamos la geometria 
 
@@ -299,6 +325,9 @@ mall_geometria <- mall$osm_polygons%>%
   select(osm_id, name)
 #ciclovias
 ciclovia_geometria <- ciclovias$osm_polygons%>%
+  select(osm_id, name)
+#servicios
+servicios_geometria <- centro_servicios$osm_polygons%>%
   select(osm_id, name)
 
 # calculamos el centroide 
@@ -323,7 +352,10 @@ centroides_mall <- gCentroid(
 centroides_ciclovias<- gCentroid( 
   as(ciclovia_geometria$geometry, "Spatial"),  
   byid = T)
-
+#servicios 
+centroides_servicios <- gCentroid( 
+  as(servicios_geometria$geometry, "Spatial"),  
+  byid = T)
 
 # convertimos los centroides a formato sf(simple features)
 
@@ -336,7 +368,9 @@ centroides_estaciones_sf <- st_as_sf(centroides_estaciones, coords = c("x", "y")
 #mall
 centroides_mall_sf <- st_as_sf(centroides_mall, coords = c("x", "y")) 
 #ciclovias
-centroides_ciclovias_sf <- st_as_sf(centroides_ciclovias, coords = c("x", "y")) 
+centroides_ciclovias_sf <- st_as_sf(centroides_ciclovias, coords = c("x", "y"))
+#servicios
+centroides_servicios_sf <- st_as_sf(centroides_servicios, coords = c("x", "y"))
 
 # Calculamos las diatnacias para cada inmueble
 
@@ -350,6 +384,8 @@ dist_estaciones <- st_distance(x = db_sf, y = centroides_estaciones_sf)
 dist_mall <- st_distance(x = db_sf, y = centroides_mall_sf)
 #ciclovias
 dist_ciclovia <- st_distance(x = db_sf, y = centroides_ciclovias_sf)
+#servicios
+dist_servicios <- st_distance(x = db_sf, y = centroides_servicios_sf)
 
 # Encontramos la distancia mínima a un parque
 
@@ -373,6 +409,10 @@ dist_min_mall <- apply(
 dist_min_ciclovias <- apply( 
   dist_ciclovia, 1, 
   min)
+#servicios
+dist_min_servicios <- apply(
+  dist_servicios, 1,
+  min)
 
 # La agregamos como variablea nuestra base de datos original 
 
@@ -381,9 +421,8 @@ bd <- bd %>%
          distancia_parques = dist_min_parque,
          distancia_estaciones_tp = dist_min_estaciones,
          distancia_mall= dist_min_mall,
-         distancia_ciclovias =dist_min_ciclovias)
-
-
+         distancia_ciclovias =dist_min_ciclovias,
+         distancia_centro_servicios = dist_min_servicios)
 
 # distribución de la variable 
 
@@ -422,3 +461,14 @@ distancia_ciclovia <- ggplot(bd, aes(x = distancia_ciclovias)) +
        title = "Distribución de la distancia a una ciclovia") +
   theme_bw()
 ggplotly(distancia_ciclovia)
+# centro servicios
+distancia_servicios<- ggplot(bd, aes(x = distancia_centro_servicios)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a centros de servicio en metros", y = "Cantidad",
+       title = "Distribución de la distancia a centro de servicios") +
+  theme_bw()
+ggplotly(distancia_servicios)
+
+
+# exportar a csv
+write_csv(bd, "base_datos_tratada.csv")
