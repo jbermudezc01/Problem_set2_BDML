@@ -108,19 +108,24 @@ autoplot(tune_tree)
 
 # seleccionar las mejores estimaciones de parametros
 
-# arboles de decisión 
 best_parms_tree <- select_best(tune_tree, metric = "mae")
 best_parms_tree
 
 # actulizar parametros con finalize_workflow() 
+
 tree_final <- finalize_workflow(workflow, best_parms_tree)
 
 #ajustar el modelo con los datos de test
-tree_final_fit <- fit(tree_final, data = test)
+tree_final_fit <- fit(tree_final, data = train)
 
-# hacemos la predición 
+# predecimos el precio para los datos de test 
+
 test <- test %>%
-  mutate(price_prediction = predict(tree_final_fit, new_data = test)[[".pred"]])
-         
-# exportar predicciones en csv
-write.csv(data$Variable1, file = "/mnt/data/Variable1.csv", row.names = FALSE)
+  mutate(price = predict(tree_final_fit, new_data = test)$.pred)
+
+# Exportar a CSV
+test %>% 
+  select(property_id, price) %>% 
+  write.csv(file = "01_decision_tree.csv", row.names = F)
+
+

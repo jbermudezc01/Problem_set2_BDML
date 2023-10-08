@@ -57,7 +57,11 @@ print(resumen_na, n = Inf)
 
 # tratamos las variables con valores faltantes: romms, bathrooms, surface_total y surface_covered
 
-# No tratar las variables de superficie dado que cuantan 
+# tratamiento de la variable surface_total con el objetivo de analizar la distribución espacial de los datos
+
+bd <- bd %>%
+  mutate(surface_total = replace_na(mean(surface_total)),
+         surface_covered = replace_na(mean(surface_covered)))
 
 # identificamos la moda de rooms y bathromms
 bd %>%
@@ -65,7 +69,7 @@ bd %>%
 bd %>%
   count(bathrooms)
 
-# Imputamos la moda y la mediana 
+# Imputamos la moda 
 bd <- bd %>%
   mutate(rooms = replace_na(rooms, 3), 
          bathrooms = replace_na(bathrooms, 2))
