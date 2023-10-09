@@ -216,8 +216,12 @@ bd <- bd %>%
 bd %>%
   count(cocina_integral)
 
+bd <- bd %>%
+  mutate(piso_laminado = as.numeric(grepl("piso laminado", description)))
+bd %>%
+  count(piso_laminado)
 
-# creación de variables espaciale #
+# creación de variables espaciales #
 
 # definir la ubicación geografica de bogotá 
 
@@ -376,7 +380,7 @@ centroides_ciclovias_sf <- st_as_sf(centroides_ciclovias, coords = c("x", "y"))
 #servicios
 centroides_servicios_sf <- st_as_sf(centroides_servicios, coords = c("x", "y"))
 
-# Calculamos las diatnacias para cada inmueble
+# Calculamos las distancias para cada inmueble
 
 #restaurantes
 dist_restaurante<- st_distance(x = db_sf, y = centroides_restaurantes_sf)
@@ -428,6 +432,36 @@ bd <- bd %>%
          distancia_ciclovias =dist_min_ciclovias,
          distancia_centro_servicios = dist_min_servicios)
 
+# creamos variables distancia polinomicas 
+
+bd <- bd%>%
+  mutate(distancia_parques2 = distancia_parques^2,
+         distancia_restaurante2 = distancia_restaurante^2,
+         distancia_estaciones_tp2 = distancia_estaciones_tp^2,
+         distancia_mall2 = distancia_mall^2,
+         distancia_ciclovia2 = distancia_ciclovias^2,
+         distancia_servicios2= distancia_centro_servicios^2,
+         distancia_parques3 = distancia_parques^3,
+         distancia_restaurante3 = distancia_restaurante^3,
+         distancia_estaciones_tp3 = distancia_estaciones_tp^3,
+         distancia_mall3 = distancia_mall^3,
+         distancia_ciclovia3 = distancia_ciclovias^3,
+         ditancia_servecios3= distancia_centro_servicios^3,
+         distancia_parques4 = distancia_parques^4,
+         distancia_restaurante4 = distancia_restaurante^4,
+         distancia_estaciones_tp4 = distancia_estaciones_tp^4,
+         distancia_mall4 = distancia_mall^4,
+         distancia_ciclovia4 = distancia_ciclovias^4,
+         ditancia_servecios4= distancia_centro_servicios^4,
+         distancia_parques5 = distancia_parques^5,
+         distancia_restaurante5 = distancia_restaurante^5,
+         distancia_estaciones_tp5 = distancia_estaciones_tp^5,
+         distancia_mall5 = distancia_mall^5,
+         distancia_ciclovia5 = distancia_ciclovias^5,
+         ditancia_servecios5= distancia_centro_servicios^5,
+         
+  )
+
 # distribución de la variable 
 
 #restaurante
@@ -472,7 +506,6 @@ distancia_servicios<- ggplot(bd, aes(x = distancia_centro_servicios)) +
        title = "Distribución de la distancia a centro de servicios") +
   theme_bw()
 ggplotly(distancia_servicios)
-
 
 # exportar a csv
 write_csv(bd, "base_datos_tratada.csv")

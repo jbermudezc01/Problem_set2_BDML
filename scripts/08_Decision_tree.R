@@ -58,7 +58,11 @@ dim(tree_grid)
 
 # especificar receta 
 
-receta <- recipe(price ~ bathrooms+bedrooms+rooms+property_type+parqueadero+terraza+ascensor+deposito+vigilancia+cocina_integral , data = bd) %>%
+receta <- recipe(price ~ bathrooms+bedrooms+rooms+
+                   property_type+parqueadero+terraza+ascensor+
+                   deposito+vigilancia+cocina_integral+distancia_parques2+
+                   distancia_restaurante2+distancia_estaciones_tp2+distancia_mall2+
+                   distancia_ciclovia2+distancia_servicios2, data = bd) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) 
@@ -126,6 +130,6 @@ test <- test %>%
 # Exportar a CSV
 test %>% 
   select(property_id, price) %>% 
-  write.csv(file = "01_decision_tree.csv", row.names = F)
+  write.csv(file = "02_decision_tree.csv", row.names = F)
 
 
