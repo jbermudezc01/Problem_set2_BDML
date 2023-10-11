@@ -34,11 +34,59 @@ bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML
 View(bd)
 
 # identificar variables de bd 
+
 str(bd)
 
-# identificar las observaciones para las categorias casa y apartamento 
-bd %>%
-  count(property_type)
+# seleccinamos variables de interes
+
+bd <- bd %>%
+  select(-city,-operation_type,-title)
+
+# Identificamos la distribución de las variables de interés
+
+# tipo de propiedad
+
+bd %>% count(property_type)
+
+# descripción de la variable price 
+
+# convertir variable a log para escalar graficos 
+
+bd <- bd%>%
+  mutate(log_price=log(price))
+
+# resumen de la distibución de la variable escalado a $
+
+summary(bd$price) %>%
+  as.matrix() %>%
+  as.data.frame()%>%
+  mutate(V1 = scales::dollar(V1))
+
+# hstrograma  estandarizado en $ 
+
+dist_precio <- ggplot(bd, aes(x = price)) +
+  geom_histogram(fill = "darkblue", alpha = 0.5) +
+  labs(x = "price", y = "Cantidad") +
+  scale_x_log10(labels = scales::dollar)+
+theme_bw()
+ggplotly(dist_precio)
+
+# relación entre precios y el tipo de propiedad 
+
+ggplot(bd, aes(x = price))+
+  geom_freqpoly(aes(color = property_type), binwidth = 5000, linewidth = 0.75) +
+  scale_x_continuous(labels = scales::dollar_format()) 
+
+# relación del precio y el número de habitaciones 
+
+ggplot(bd, aes(x = rooms, y = price)) + 
+  geom_boxplot(aes(group = cut_width(rooms, 0.1)))
+
+# relación del precio y el número de baños 
+
+ggplot(bd, aes(x = bathrooms, y = price)) + 
+  geom_boxplot(aes(group = cut_width(bathrooms, 0.1)))
+
 
 # verificamos valores faltantes 
 
@@ -51,17 +99,9 @@ resumen_na <- bd %>%
   pivot_longer(everything(),
                names_to = c("variable", ".measure"),
                names_pattern = "(.*)_(.*)")
-
-# Ver los resultados
 print(resumen_na, n = Inf)
 
-# tratamos las variables con valores faltantes: romms, bathrooms, surface_total y surface_covered
-
-# tratamiento de la variable surface_total con el objetivo de analizar la distribución espacial de los datos
-
-bd <- bd %>%
-  mutate(surface_total = replace_na(mean(surface_total)),
-         surface_covered = replace_na(mean(surface_covered)))
+# tratamos los valores faltantes en las variables roomms y bathrooms
 
 # identificamos la moda de rooms y bathromms
 bd %>%
@@ -75,94 +115,11 @@ bd <- bd %>%
          bathrooms = replace_na(bathrooms, 2))
          
 
-# tratamiento de la variable precio 
+# Tratamiento de la variable description 
 
-# descrición y escalamiento de la variable precio
-summary(bd$price) %>%
-  as.matrix() %>%
-  as.data.frame()%>%
-  mutate(V1 = scales::dollar(V1)) 
-
-# calculamos el precio por m2
-bd <- bd %>%
-  mutate(precio_por_mt2 = round(price / surface_total, 0))
-
-# descrición y escalamiento de la variable precio por m2
-summary(bd$precio_por_mt2) %>%
-  as.matrix() %>%
-  as.data.frame()%>%
-  mutate(V1 = scales::dollar(V1)) 
-
-# visualizamos la distribución de nuestra variable de interés 
-pm <- ggplot(bd, aes(x = precio_por_mt2)) +
-  geom_histogram(fill = "darkblue", alpha = 0.5) +
-  labs(x = "Valor de venta (log-scale)", y = "Cantidad") +
-  scale_x_log10(labels = scales::dollar)
-  theme_bw()
-ggplotly(pm)
-
-# tratar valores atipicos de la variable precio que pueden afectar predicción 
-bd <- bd %>%
-  filter(between(precio_por_mt2, 1000000, 15e6) | is.na(precio_por_mt2))
-
-
-# visualizamos la distribución de la variable precio 
- p <- ggplot(bd, aes(x = price)) +
-  geom_histogram(fill = "darkblue", alpha = 0.4) +
-  labs(x = "Valor de venta (log-scale)", y = "Cantidad") +
-  scale_x_log10(labels = scales::dollar) +
-  theme_bw()
-ggplotly(p)
-
-
-### analizar el patrón espacial ###
-
-# distribución de los puntos 
-
-leaflet() %>%          # Inicia la creación de un mapa leaflet
-  addTiles() %>%       # Añade las teselas (tiles) básicas al mapa (esto podría ser un mapa base de OpenStreetMap, por ejemplo)
-  addCircles(          # Añade círculos al mapa en las coordenadas especificadas
-    lng = bd$lon,      # Define la longitud de los círculos utilizando la columna 'lon' del dataframe 'db'
-    lat = bd$lat       # Define la latitud de los círculos utilizando la columna 'lat' del dataframe 'db'
-  )
-
-# creamos un mapa mas preciso con las siguientes caracateristicas: 
-
-# 1. Vamos a utilizar el color del marcador para designar si es casa o apartamento
-# 2. definir el tamaño del marcador según el valor del metro cuadrado
-# 3. vamos a crear un pop-up
-# 4. vamos a ajustar el zoom y centrar el mapa
-
-# Escalamos para que se pueda graficar, utilizando min max sclaing 
-
-bd <- bd %>%
-  mutate(precio_por_mt2_sc = (precio_por_mt2 - min(precio_por_mt2, na.rm = TRUE)) / 
-           (max(precio_por_mt2, na.rm = TRUE) - min(precio_por_mt2, na.rm = TRUE)))
-
-# creamos variable color que depende de apto o casa 
-
-bd <- bd %>%
-  mutate(color = case_when(property_type == "Apartamento" ~ "#2A9D8F",
-                           property_type == "Casa" ~ "#F4A261"))
-
-# Encontram,os el queremos que sea el centro del mapa 
-latitud_central <- mean(bd$lat)
-longitud_central <- mean(bd$lon)
-
-# Creamos el plot
-leaflet() %>% # inicia la creacion de un mapa leaflet
-  addTiles() %>% # añade las capas basicas del mapa : calles, edificios, etc
-  setView(lng = longitud_central, lat = latitud_central, zoom = 12) %>% # centra el mapa en las coordendas medias de lon y lat
-  addCircles(lng = bd$lon, # añade circulos al mapa en las coordenas de capa inmueble 
-             lat = bd$lat, 
-             col = bd$color, # define el color de los circulos según la variable color 
-             fillOpacity = 1, # Define la opacidad del relleno de los círculos como 1 (completamente opacos)
-             opacity = 1, # Define la opacidad del borde de los círculos como 1 (completamente opacos)
-             radius = bd$precio_por_mt2_sc*10) # Define el radio de los círculos basándose en la columna precio_por_mt2_sc del dataframe db, escalado por un factor de 10
-             
-# Tratamiento de la variables descripción 
 
 # normalizar el texto 
+
 # Todo en minuscula
 bd <- bd %>%
   mutate(description = str_to_lower(description))
@@ -201,12 +158,15 @@ bd %>%
 # variable deposito
 bd <- bd %>%
   mutate(deposito = as.numeric(grepl("bodega|deposito", description, ignore.case = TRUE)))
+
 bd %>%
   count(deposito)
 
-# variable vigilancia 
+# variable vigilancia
+
 bd <- bd %>%
   mutate(vigilancia = as.numeric(grepl("vigilancia|porteria", description, ignore.case = TRUE)))
+
 bd %>%
   count(vigilancia)
 
@@ -216,11 +176,26 @@ bd <- bd %>%
 bd %>%
   count(cocina_integral)
 
+# variable piso laminado 
+
 bd <- bd %>%
   mutate(piso_laminado = as.numeric(grepl("piso laminado", description)))
 bd %>%
   count(piso_laminado)
 
+# transformar variables nuemricas binarias a cetegoricas 
+
+#mutación de factores
+bd<-bd %>% 
+  mutate(parqueadero=factor(parqueadero,levels=c(0,1),labels=c("no tine","Si tiene")),
+         terraza=factor(terraza,levels=c(0,1),labels=c("no tiene", "si tiene")),
+         ascensor=factor(ascensor,levels=c(0,1),labels=c("no tiene", "si tiene")),
+         deposito=factor(deposito,levels=c(0,1),labels=c("no tiene","si tiene")),
+         vigilancia=factor(vigilancia,levels=c(0,1),labels=c("no tiene","si tiene")),
+         cocina_integral=factor(cocina_integral,levels=c(0,1),labels=c("no tiene","si tiene")),
+         piso_laminado=factor(piso_laminado,levels=c(0,1),labels = c("no tiene", "si tiene")),
+         property_type = as.factor(property_type))
+                          
 # creación de variables espaciales #
 
 # definir la ubicación geografica de bogotá 
@@ -458,9 +433,7 @@ bd <- bd%>%
          distancia_estaciones_tp5 = distancia_estaciones_tp^5,
          distancia_mall5 = distancia_mall^5,
          distancia_ciclovia5 = distancia_ciclovias^5,
-         ditancia_servecios5= distancia_centro_servicios^5,
-         
-  )
+         ditancia_servecios5= distancia_centro_servicios^5)
 
 # distribución de la variable 
 
@@ -508,4 +481,5 @@ distancia_servicios<- ggplot(bd, aes(x = distancia_centro_servicios)) +
 ggplotly(distancia_servicios)
 
 # exportar a csv
-write_csv(bd, "base_datos_tratada.csv")
+
+write_csv(bd, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_tratada.csv")
