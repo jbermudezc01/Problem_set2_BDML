@@ -117,7 +117,6 @@ bd <- bd %>%
 
 # Tratamiento de la variable description 
 
-
 # normalizar el texto 
 
 # Todo en minuscula
@@ -135,9 +134,91 @@ bd <- bd %>%
 
 # creamos variables a partir del texto 
 
+# crear la varibale piso 
+
+# primera mutación
+bd <- bd %>%
+  mutate(piso_info= str_extract(description, "(\\w+|\\d+) piso (\\w+|\\d+)"))
+
+# transformación de número escritos a númericos 
+
+numeros_escritos <- c("uno|primero|primer", "dos|segundo|segund", "tres|tercero|tercer", "cuatro|cuarto", "cinco|quinto", "seis|sexto", "siete|septimo", "ocho|octavo", "nueve|noveno", "diez|decimo|dei")
+numeros_numericos <- as.character(1:10)
+bd<- bd %>%
+  mutate(piso_info = str_replace_all(piso_info, setNames(numeros_numericos,numeros_escritos)))
+
+# extracción de números 
+bd<- bd %>%
+  mutate(piso_numerico = as.integer(str_extract(piso_info, "\\d+")))
+
+#limpieza de datos 
+bd <- bd %>%
+  mutate(piso_numerico = ifelse(piso_numerico > 20, NA, piso_numerico))
+
+# imputar valores faltantes de esta variable 
+
+# moda de los apartamentos 
+bd %>%
+  filter(property_type == "Apartamento") %>%
+  count(piso_numerico) # 2 piso 
+
+# moda de casas 
+
+bd %>%
+  filter(property_type == "Casa") %>%
+  count(piso_numerico) # 1 piso 
+
+# reemplazamos 1 
+
+bd <- bd %>%
+  mutate(piso_numerico = replace_na(piso_numerico, 2))
+
+
+# creamos variable piso 
+
+db <- db %>%
+  mutate(piso_info= str_extract(description, "(\\w+|\\d+) piso (\\w+|\\d+)"))
+
+# transformación de número escritos a númericos 
+
+numeros_escritos <- c("uno|primero|primer", "dos|segundo|segund", "tres|tercero|tercer", "cuatro|cuarto", "cinco|quinto", "seis|sexto", "siete|septimo", "ocho|octavo", "nueve|noveno", "diez|decimo|dei")
+numeros_numericos <- as.character(1:10)
+db <- db %>%
+  mutate(piso_info = str_replace_all(piso_info, setNames(numeros_numericos,numeros_escritos)))
+# descripción del proceso 
+# Aquí, estás reemplazando las palabras que representan números (como "uno", "dos", "tres", etc.) con sus equivalentes numéricos (como "1", "2", "3", etc.) en la columna piso_info.
+
+# extracción de números 
+db <- db %>%
+  mutate(piso_numerico = as.integer(str_extract(piso_info, "\\d+")))
+# descripción del proceso 
+# Luego, creas otra columna, piso_numerico, que contiene el valor numérico extraído de piso_info. Usas str_extract con el patrón regex "\\d+" para extraer uno o más dígitos y luego los conviertes a enteros.
+
+#limpieza de datos 
+db <- db %>%
+  mutate(piso_numerico = ifelse(piso_numerico > 20, NA, piso_numerico))
+# limpias los datos en piso_numerico reemplazando los valores mayores a 20 con NA (valores perdidos). Probablemente esto se hace para eliminar valores atípicos o errores de entrada
+
+# imputar valores faltantes de esta variable 
+
+# moda de los apartamentos 
+db %>%
+  filter(property_type_2 == "Apartamento") %>%
+  count(piso_numerico)
+# la moda es 1 piso 
+# moda de casas 
+db %>%
+  filter(property_type_2 == "Casa") %>%
+  count(piso_numerico)
+# la moda es 1 
+
+# reemplazamos 1 
+db <- db %>%
+  mutate(piso_numerico = replace_na(piso_numerico, 1))
+
 # variable parqueadero 
 bd <- bd %>%
-  mutate(parqueadero = as.numeric(grepl("parqueadero", description)))
+  mutate(parqueadero = as.numeric(grepl("parqueadero|garaje", description)))
 bd %>%
   count(parqueadero)
 
@@ -165,7 +246,7 @@ bd %>%
 # variable vigilancia
 
 bd <- bd %>%
-  mutate(vigilancia = as.numeric(grepl("vigilancia|porteria", description, ignore.case = TRUE)))
+  mutate(vigilancia = as.numeric(grepl("seguridad|vigilancia|porteria", description, ignore.case = TRUE)))
 
 bd %>%
   count(vigilancia)
