@@ -49,20 +49,19 @@ tree_model <- decision_tree(tree_depth = tune(),
 # crear grilla de parametros 
 
 tree_grid <- grid_random(
-  tree_depth(range = c(1, 10), trans= NULL),# modificar para cada modelo 
-  min_n(range = c(2, 100), trans = NULL),# modificar para cada modelo 
-  size = 50
+  tree_depth(range = c(1, 20), trans= NULL),# modificar para cada modelo 
+  min_n(range = c(20,3000 ), trans = NULL),# modificar para cada modelo 
+  size = 100
 )
 head(tree_grid, n=20)
 dim(tree_grid)
 
 # especificar receta 
 
-receta <- recipe(price ~ bathrooms+bedrooms+rooms+
-                   property_type+parqueadero+terraza+ascensor+
-                   deposito+vigilancia+cocina_integral+distancia_parques2+
-                   distancia_restaurante2+distancia_estaciones_tp2+distancia_mall2+
-                   distancia_ciclovia2+distancia_servicios2, data = bd) %>%
+receta <- recipe(price ~ bathrooms+rooms+
+                   +parqueadero+terraza+ascensor+
+                   deposito+vigilancia+cocina_integral+distancia_parques+
+                   distancia_restaurante, data = bd) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) 
@@ -130,6 +129,6 @@ test <- test %>%
 # Exportar a CSV
 test %>% 
   select(property_id, price) %>% 
-  write.csv(file = "02_decision_tree.csv", row.names = F)
+  write.csv(file = "04_decision_tree.csv", row.names = F)
 
 
