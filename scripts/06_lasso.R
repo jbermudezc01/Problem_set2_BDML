@@ -45,16 +45,18 @@ lasso_spec <- linear_reg(penalty = tune(), mixture = 1) %>%
   set_mode("regression") %>%
   set_engine("glmnet") 
 
+head(bd)
+
 # definir intervalo de parametros
 
-penalty_grid <- grid_regular(penalty(range = c(-2, 2)), levels = 50)
+penalty_grid <- grid_regular(penalty(range = c(-2, 2)), levels = 30)
 
 # receta de preprocesamiento 
 
 receta <- recipe(formula = price ~ bathrooms+
                    bedrooms+rooms+property_type+parqueadero+
-                   terraza+ascensor+deposito+vigilancia+cocina_integral+distancia_parques+
-                   distancia_estaciones_tp+distancia_centro_servicios, data = bd) %>% 
+                   terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+distancia_restaurante+
+                   distancia_parques+ distancia_estaciones_tp+ distancia_mall+distancia_ciclovias, data = bd) %>% 
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
@@ -124,5 +126,5 @@ test <- test %>%
 # Exportar a CSV
 test %>% 
   select(property_id, price) %>% 
-  write.csv(file = "01_lasso.csv", row.names = F)
+  write.csv(file = "05_lasso.csv", row.names = F)
 

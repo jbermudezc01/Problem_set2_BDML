@@ -47,13 +47,14 @@ ridge_spec <- linear_reg(penalty = tune(), mixture = 0) %>%
 
 # definir intervalo de parametros
 
-penalty_grid <- grid_regular(penalty(range = c(-2, 2)), levels = 20)
+penalty_grid <- grid_regular(penalty(range = c(-4, 2)), levels = 30)
 
 # receta de preprocesamiento 
 
-receta <- recipe(formula = price ~ bathrooms+bedrooms+
-                   rooms+property_type+parqueadero+
-                   terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado, data = bd) %>% 
+receta <- recipe(formula = price ~ bathrooms+bedrooms+property_type+
+                   +parqueadero+terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+
+                   distancia_parques+distancia_parques2+distancia_restaurante+distancia_estaciones_tp+
+                   distancia_centro_servicios, data = bd) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
@@ -100,7 +101,7 @@ tune_ridge <- tune_grid(
 )
 # grafica de parametros 
 
-autoplot(tune_rigde)
+autoplot(tune_ridge)
 
 # seleccionar las mejores estimaciones de parametros
 
@@ -123,4 +124,4 @@ test <- test %>%
 # Exportar a CSV
 test %>% 
   select(property_id, price) %>% 
-  write.csv(file = "03_ridge.csv", row.names = F)
+  write.csv(file = "04_ridge.csv", row.names = F)
