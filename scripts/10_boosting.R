@@ -38,6 +38,8 @@ train <-  bd %>%
 test <- bd %>%
   subset(type_data == 2)
 
+head(bd)
+
 # modelo boosting
 
 # especificar el modelo 
@@ -52,18 +54,17 @@ boost_spec <- boost_tree(
 # Tune grid aleatorio para el modelo de boost
 
 boost_grid <- grid_random(
-  trees(range = c(400, 600)),
-  min_n(range = c(1, 3)),
-  learn_rate(range = c(0.001, 0.01)), size = 4
+  trees(range = c(100, 500)),
+  min_n(range = c(1, 10)),
+  learn_rate(range = c(0.001, 0.1)),
+  size = 5
 )
 
 # especificar la receta
 
-receta <- recipe(price ~ distancia_parques2+bathrooms+
-                                      bedrooms+rooms+property_type+parqueadero+
-                                      terraza+ascensor+deposito+vigilancia+cocina_integral+
-                                     distancia_restaurante2+distancia_estaciones_tp2+distancia_mall2+
-                                     distancia_ciclovia2+distancia_servicios2, data = bd) %>%
+receta <- recipe(price ~ piso_numerico+bathrooms+bedrooms+rooms+property_type+parqueadero+
+                   terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+
+                   distancia_restaurante+distancia_parques+distancia_estaciones_tp+distancia_mall, data = bd) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) 
