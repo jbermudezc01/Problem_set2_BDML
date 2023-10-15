@@ -21,30 +21,42 @@ p_load(tidyverse, # Manipular dataframes
        rattle, # Interfaz gráfica para el modelado de datos
        spatialsample)
 
-# cargar bases de datos 
+# cargar bases de datos espaciales de bogota 
 
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/manz")
+# Cargar datos espaciales 
+
+#manzanas
+setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/manzanas_bogota")
 manzanas <- st_read("MANZ.shp")
 
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/Valor_ref_2022")
+# valor catastral de referencia 
+setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/valor_catastral_referencia_2022_bogota")
 valor_referencia <- st_read("Valor_ref_2022.shp")
 
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/AconstruidaResidencial")
+#area construida residencial 
+setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/Area_construida_residencial_manzana_bogota")
 area_construida <- st_read("AconstruidaResidencial.shp")
 
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/CantidadSHP")
+#cantidad de predios 
+setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/cantidad_predios_manzana_bogota")
 cantidad_predios <- st_read("CantidadPM.shp")
 
+#localidades
+setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/localidades_bogota")
+localidades <- st_read("Loca.shp")
 
-df <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
+
+# base de datos taller 
+df <- read.csv("https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_transformada.csv")
+
 
 # convertir base de datos del taller en objeto sf 
  
-df <- st_as_sf(bd, coords = c("lon","lat"), crs = 4326)
+df <- st_as_sf(df, coords = c("lon","lat"), crs = 4326)
 
 # identificar el tipo de geometria 
 
-geom_type <- st_geometry_type(cantidad_predios)
+geom_type <- st_geometry_type(localidades)
 print(table(geom_type))
 
 # hacer join espacial 
@@ -54,11 +66,12 @@ print(table(geom_type))
 area_construida_valid <- st_make_valid(area_construida)
 valor_referencia_valid <- st_make_valid(valor_referencia)
 cantidad_predios_valid <- st_make_valid(cantidad_predios)
-
-# convertir al mismo sistem de coordenadas 
+manzanas_valid <- st_make_valid(manzanas)
+localidades_valid <- st_make_valid(localidades)
 
 
 #  realizar la unión 
+
 # area superficie
 df <- st_join(df, area_construida_valid, join = st_within)
 
@@ -68,42 +81,92 @@ df <- st_join(df, valor_referencia_valid, join = st_within)
 # cantidad de predios
 df <- st_join(df,cantidad_predios_valid, join=st_within)
 
+# localidad 
+# convertir a sistema de coordenadas de df 
+df <- st_transform(df, crs = st_crs(localidades_valid))
+#unir base de datos 
+df <- st_join(df,localidades_valid,join = st_within)
+
 # eliminar los valores duplicados 
-
-# area construida residencial 
-
 df <- df %>% 
   distinct(property_id, geometry, .keep_all = TRUE)
-
 
 # limpiar base de datos 
 
 df <- df %>%
-  select(-c(MANCODIGO.y,MANCODIGO,ANO.x,ANO.y,ANO,
-            OBJECTID,OBJECTID.x,OBJECTID.y,SHAPE_AREA.x,SHAPE_Area,
-            SHAPE_LEN.x,SHAPE_Leng,SHAPE_AREA.y,SHAPE_LEN.y))
+  select(-c(OBJECTID,OBJECTID.x,OBJECTID.y,MANCODIGO.x,MANCODIGO.y,
+            ANO.x,ANO.y,ANO,SHAPE_AREA.x,SHAPE_LEN.x,SHAPE_Area.x,SHAPE_Leng.x,
+            SHAPE_AREA.y,SHAPE_LEN.y,SHAPE_Leng.y,SHAPE_Area.y,LocAAdmini,LocArea))
+
+# renombrar variables 
+
+df <- df%>%
+  rename(area_residencial_manzana = AREA_RESID,
+         valor_catastral_referencia_2022 = V_REF,
+         codigo_manzana = MANCODIGO,
+         numero_predios_manzana = N_PREDIOS,
+         nombre_localidad = LocNombre,
+         codigo_localidad = LocCodigo)
+
+# transformar a factor variable localidad 
+df <- df%>%
+mutate(nombre_localidad = as.factor(nombre_localidad))
+
 
 # identificar los NA para las variables agregadas
 
 df %>% 
   summarise(
-    na_count_area = sum(is.na(AREA_RESID)), # 37,7 %
-    na_count_valor_ref = sum(is.na(V_REF))) # 34,3 %
+    na_count_area = sum(is.na(area_residencial_manzana)), # 37,7 %
+    na_count_valor =sum(is.na(valor_catastral_referencia_2022)),
+    na_count_predios = sum(is.na(numero_predios_manzana)), # 33,4 %
+    na_count_localidad =sum(is.na(codigo_localidad))) 
     
+
 # Imputar NA por la media 
+
 df <- df %>%
   mutate(
-    area_residencial_manzana = ifelse(is.na(AREA_RESID), mean(AREA_RESID, na.rm = TRUE), AREA_RESID),
-   valor_referencia = ifelse(is.na(V_REF), mean(V_REF, na.rm = TRUE), V_REF),
-   numero_predios_manzana = ifelse(is.na(N_PREDIOS), mean(N_PREDIOS, na.rm = TRUE), N_PREDIOS)
+    area_residencial_manzana = ifelse(is.na(area_residencial_manzana), mean(area_residencial_manzana, na.rm = TRUE), area_residencial_manzana),
+    valor_catastral_referencia_2022 = ifelse(is.na(valor_catastral_referencia_2022), mean(valor_catastral_referencia_2022, na.rm = TRUE), valor_catastral_referencia_2022),
+   numero_predios_manzana = ifelse(is.na(numero_predios_manzana), mean(numero_predios_manzana, na.rm = TRUE), numero_predios_manzana)
   )
 
+# crear variable area construida_residencual_predio 
+
 df <- df%>%
-  mutate(area_superfice_vivienda = area_residencial_manzana/numero_predios_manzana)
+  mutate(area_construida_residencial_predio = area_residencial_manzana/numero_predios_manzana)
+
+# aproximar area_residencial_vivienda con la variable area construida_residencual_predio 
+
+# Crear una función llamada reasignar_valores
+reasignar_valores <- function(df) {
+  # Definir las nuevas asignaciones para cada localidad
+  nuevas_asignaciones <- c(USAQUEN = 66, CHAPINERO = 65, SANTA_FE = 72, SAN_CRISTOBAL = 134,
+                           USME = 113, TUNJUELITO = 166, BOSA = 104, KENNEDY = 99, FONTIBON = 71,
+                           ENGATIVA = 106, SUBA = 73, BARRIOS_UNIDOS = 117, TEUSAQUILLO = 78,
+                           LOS_MARTIRES = 105, ANTONIO_NARINO = 166, PUENTE_ARANDA = 157,
+                           LA_CANDELARIA = 85, RAFAEL_URIBE_URIBE = 142, CIUDAD_BOLIVAR = 112)
+  
+  # Reasignar los valores basados en los nombres de las localidades y el criterio en area_construida_residencial_predio
+  df <- df %>%
+    mutate(area_construida_residencial_predio = ifelse(area_construida_residencial_predio > 216 & 
+                                                         nombre_localidad %in% names(nuevas_asignaciones),
+                                                       nuevas_asignaciones[nombre_localidad],
+                                                       area_construida_residencial_predio))
+  
+  # Retornar el dataframe modificado
+  return(df)
+}
+
+# ajustar en el data frame 
+df <- reasignar_valores(df)
+
+df <- df%>%
+    mutate(valor_catastral_vivienda = area_construida_residencial_predio*valor_catastral_referencia_2022)
 
 # guardar en github 
 
-write_csv(df, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_espaciales_Bogotá.csv")
+write_csv(df, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_tratada.csv")
 
 
- 
