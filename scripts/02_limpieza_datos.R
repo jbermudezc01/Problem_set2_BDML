@@ -520,6 +520,16 @@ distancia_servicios<- ggplot(bd, aes(x = distancia_centro_servicios)) +
   theme_bw()
 ggplotly(distancia_servicios)
 
+# unir variables construidas con bases de datos espaciales de bogotá 
+
+# cargar datos de variables espaciales
+ve <- read.csv("https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/variables_espaciales.csv")
+# unir a bd 
+
+
+
+
+
 # exportar a csv
 
-write_csv(bd, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_transformada.csv")
+write_csv(bd, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_tratada.csv")
