@@ -36,7 +36,7 @@ setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bog
 cantidad_predios <- st_read("CantidadPM.shp")
 
 
-bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
+df <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
 
 # convertir base de datos del taller en objeto sf 
  
@@ -79,7 +79,7 @@ df <- df %>%
 # limpiar base de datos 
 
 df <- df %>%
-  select(-c(MANCODIGO.x,MANCODIGO.y,MANCODIGO,ANO.x,ANO.y,ANO,
+  select(-c(MANCODIGO.y,MANCODIGO,ANO.x,ANO.y,ANO,
             OBJECTID,OBJECTID.x,OBJECTID.y,SHAPE_AREA.x,SHAPE_Area,
             SHAPE_LEN.x,SHAPE_Leng,SHAPE_AREA.y,SHAPE_LEN.y))
 

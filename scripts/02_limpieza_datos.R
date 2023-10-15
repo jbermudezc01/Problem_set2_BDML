@@ -114,7 +114,6 @@ bd <- bd %>%
   mutate(rooms = replace_na(rooms, 3), 
          bathrooms = replace_na(bathrooms, 2))
          
-
 # Tratamiento de la variable description 
 
 # normalizar el texto 
@@ -173,49 +172,6 @@ bd %>%
 bd <- bd %>%
   mutate(piso_numerico = replace_na(piso_numerico, 2))
 
-
-# creamos variable piso 
-
-db <- db %>%
-  mutate(piso_info= str_extract(description, "(\\w+|\\d+) piso (\\w+|\\d+)"))
-
-# transformación de número escritos a númericos 
-
-numeros_escritos <- c("uno|primero|primer", "dos|segundo|segund", "tres|tercero|tercer", "cuatro|cuarto", "cinco|quinto", "seis|sexto", "siete|septimo", "ocho|octavo", "nueve|noveno", "diez|decimo|dei")
-numeros_numericos <- as.character(1:10)
-db <- db %>%
-  mutate(piso_info = str_replace_all(piso_info, setNames(numeros_numericos,numeros_escritos)))
-# descripción del proceso 
-# Aquí, estás reemplazando las palabras que representan números (como "uno", "dos", "tres", etc.) con sus equivalentes numéricos (como "1", "2", "3", etc.) en la columna piso_info.
-
-# extracción de números 
-db <- db %>%
-  mutate(piso_numerico = as.integer(str_extract(piso_info, "\\d+")))
-# descripción del proceso 
-# Luego, creas otra columna, piso_numerico, que contiene el valor numérico extraído de piso_info. Usas str_extract con el patrón regex "\\d+" para extraer uno o más dígitos y luego los conviertes a enteros.
-
-#limpieza de datos 
-db <- db %>%
-  mutate(piso_numerico = ifelse(piso_numerico > 20, NA, piso_numerico))
-# limpias los datos en piso_numerico reemplazando los valores mayores a 20 con NA (valores perdidos). Probablemente esto se hace para eliminar valores atípicos o errores de entrada
-
-# imputar valores faltantes de esta variable 
-
-# moda de los apartamentos 
-db %>%
-  filter(property_type_2 == "Apartamento") %>%
-  count(piso_numerico)
-# la moda es 1 piso 
-# moda de casas 
-db %>%
-  filter(property_type_2 == "Casa") %>%
-  count(piso_numerico)
-# la moda es 1 
-
-# reemplazamos 1 
-db <- db %>%
-  mutate(piso_numerico = replace_na(piso_numerico, 1))
-
 # variable parqueadero 
 bd <- bd %>%
   mutate(parqueadero = as.numeric(grepl("parqueadero|garaje", description)))
@@ -237,6 +193,7 @@ bd %>%
   count(vigilancia)
 
 # variable deposito
+
 bd <- bd %>%
   mutate(deposito = as.numeric(grepl("bodega|deposito", description, ignore.case = TRUE)))
 
@@ -252,8 +209,10 @@ bd %>%
   count(vigilancia)
 
 # variable de cocina integral
+
 bd <- bd %>%
   mutate(cocina_integral = as.numeric(grepl("cocina integral", description)))
+
 bd %>%
   count(cocina_integral)
 
@@ -563,4 +522,4 @@ ggplotly(distancia_servicios)
 
 # exportar a csv
 
-write_csv(bd, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_tratada.csv")
+write_csv(bd, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_transformada.csv")
