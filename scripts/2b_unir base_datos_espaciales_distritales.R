@@ -47,7 +47,7 @@ localidades <- st_read("Loca.shp")
 
 
 # base de datos taller 
-df <- read.csv("https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_transformada.csv")
+df <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/bd.csv')
 
 
 # convertir base de datos del taller en objeto sf 
@@ -165,8 +165,10 @@ df <- reasignar_valores(df)
 df <- df%>%
     mutate(valor_catastral_vivienda = area_construida_residencial_predio*valor_catastral_referencia_2022)
 
-# guardar en github 
+# seleccionar base de datos 
 
-write_csv(df, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_tratada.csv")
+df <- df%>%
+  select(area_residencial_manzana,area_construida_residencial_predio,numero_predios_manzana,
+         valor_catastral_referencia_2022,valor_catastral_vivienda,nombre_localidad)
 
-
+write_csv(df, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/variables_espaciales.csv")
