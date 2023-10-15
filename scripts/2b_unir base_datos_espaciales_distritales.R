@@ -168,7 +168,7 @@ df <- df%>%
 # seleccionar base de datos 
 
 df <- df%>%
-  select(area_residencial_manzana,area_construida_residencial_predio,numero_predios_manzana,
+  select(property_id,area_residencial_manzana,area_construida_residencial_predio,numero_predios_manzana,
          valor_catastral_referencia_2022,valor_catastral_vivienda,nombre_localidad)
 
 write_csv(df, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/variables_espaciales.csv")
