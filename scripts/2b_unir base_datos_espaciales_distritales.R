@@ -26,25 +26,24 @@ p_load(tidyverse, # Manipular dataframes
 # Cargar datos espaciales 
 
 #manzanas
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/manzanas_bogota")
+setwd("/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/Bases de datos Bogotá/manzanas_bogota")
 manzanas <- st_read("MANZ.shp")
 
 # valor catastral de referencia 
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/valor_catastral_referencia_2022_bogota")
+setwd("/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/Bases de datos Bogotá/valor_catastral_referencia_2022_bogota")
 valor_referencia <- st_read("Valor_ref_2022.shp")
 
 #area construida residencial 
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/Area_construida_residencial_manzana_bogota")
+setwd("/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/Bases de datos Bogotá/Area_construida_residencial_manzana_bogota")
 area_construida <- st_read("AconstruidaResidencial.shp")
 
 #cantidad de predios 
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/cantidad_predios_manzana_bogota")
+setwd("/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/Bases de datos Bogotá/cantidad_predios_manzana_bogota")
 cantidad_predios <- st_read("CantidadPM.shp")
 
 #localidades
-setwd("/Users/apple/Desktop/En proceso/Taller 2 /Datos de bogotá /Mapas de bogotá/localidades_bogota")
+setwd("/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/Bases de datos Bogotá/localidades_bogota")
 localidades <- st_read("Loca.shp")
-
 
 # base de datos taller 
 df <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/bd.csv')
