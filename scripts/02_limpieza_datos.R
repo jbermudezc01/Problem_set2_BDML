@@ -310,7 +310,7 @@ bd <- bd%>%
 
 
 # Exportar a csv y .RData -------------------------------------------------
-write_csv(df, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_tratada.csv")
+write_csv(df, file = paste0(stores,'base_datos_tratada.csv'))
 save(bd, geometria.osm, coordenadas.x.centroides, coordenadas.y.centroides, file = paste0(stores,'Datos_limpios.RData'))
 
 # En //Datos_limpios.RData van a guardarse la base de datos bd, la geometria.osm, coordenadas.x.centroides y 
