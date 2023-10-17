@@ -138,6 +138,34 @@ bd <- bd %>%
 bd <- bd %>%
   mutate(piso_laminado = as.numeric(grepl("piso laminado", description)))
 
+#Variable surface
+
+
+bd <- bd %>%
+  mutate(surface = ifelse(!is.na(surface_covered),surface_covered, 
+                          gsub(".*\\s(\\d+)m2.*", "\\1", description)))
+bd <- bd %>%
+  mutate(surface = ifelse(nchar(surface)>5,
+                          gsub(".*\\s(\\d+)\\smt.*", "\\1", description), surface))
+bd <- bd %>%
+  mutate(surface = ifelse(nchar(surface)>5,
+                          gsub(".*\\s(\\d+)\\sm2.*", "\\1", description), surface))
+bd <- bd %>%
+  mutate(surface = ifelse(nchar(surface)>5, 
+                          gsub(".*\\s(\\d+)mt.*", "\\1", description), surface))
+bd <- bd %>%
+  mutate(surface = ifelse(nchar(surface)>5, 
+                          gsub(".*\\s(\\d+)m.*", "\\1", description), surface))
+bd <- bd %>%
+  mutate(surface = ifelse(nchar(surface)>5, 
+                          gsub(".*\\s(\\d+)\\sm.*", "\\1", description), surface))
+
+bd <- bd %>%
+  mutate(surface = ifelse(nchar(surface)>5, NA, surface))
+
+bd$surface<-as.numeric(bd$surface)
+
+
 # Transformacion de variables ---------------------------------------------
 
 # Transformar variables numericas binarias a categoricas 
