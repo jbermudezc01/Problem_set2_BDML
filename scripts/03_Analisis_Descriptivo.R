@@ -33,59 +33,69 @@ ggplot(bd, aes(x = rooms, y = price)) +
 ggplot(bd, aes(x = bathrooms, y = price)) + 
   geom_boxplot(aes(group = cut_width(bathrooms, 0.1)))
 
-# Graficas espaciales -----------------------------------------------------
+# Visualizar localizacion variables OSM -----------------------------------
 
+
+# Encontrammos el queremos que sea el centro del mapa  . bd es la base principal
+latitud_central  <- mean(bd$lat)
+longitud_central <- mean(bd$lon)
+
+# GRAFICAR CORRECTAMENTE , iterando a traves de geometria.osm que tiene los poligonos, y coordenadas.x.centroides
+# con coordenadas.y.centroides que tienen las coordenadas de centroides
 leaflet() %>%
   addTiles() %>%
-  addCircles(lng = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[1]))), 
-             lat = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[2]))))
+  setView(lng = longitud_central, lat = latitud_central, zoom = 12) %>%
+  addPolygons(data = geometria.osm[[3]], col = "red",weight = 10,
+              opacity = 0.8, popup = geometria.osm[[1]]$name) %>%
+  addCircles(lng = coordenadas.x.centroides[[3]], 
+             lat = coordenadas.y.centroides[[3]], 
+             col = "darkblue", opacity = 0.5, radius = 1)
 
-# visulizar su localización 
 
-# crear puntos
+# Grafica variables distancias --------------------------------------------
+# Distribución de la variable 
 
-#restaurantes
-puntos_restaurantes <- restaurantes$osm_points
-head(puntos_restaurantes)
+#restaurante
+distancia_restaurantes <- ggplot(bd, aes(x = distancia_restaurante)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a un restaurante en metros", y = "Cantidad",
+       title = "Distribución de la distancia a restaurantes") +
+  theme_bw()
+ggplotly(distancia_restaurantes)
 #parques
-puntos_parques <- parques$osm_points
-head(puntos_parques)
+distancia_parques <- ggplot(bd, aes(x = distancia_parques)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a un parque en metros", y = "Cantidad",
+       title = "Distribución de la distancia a parques") +
+  theme_bw()
+ggplotly(distancia_parques)
 #estaciones
-puntos_estaciones <-estaciones$osm_points
-head(puntos_estaciones)
+distancia_estaciones <- ggplot(bd, aes(x = distancia_estaciones_tp)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a una estación de transporte público en metros", y = "Cantidad",
+       title = "Distribución de la distancia a una estación de transporte público") +
+  theme_bw()
+ggplotly(distancia_estaciones)
 #mall
-puntos_mall <- mall$osm_points
-head(puntos_mall)
-#ciclovia
-puntos_ciclovia <- ciclovias$osm_points
-head(puntos_ciclovia)
-# centros_servicios
-puntos_servicios <- centro_servicios$osm_points
-head(puntos_servicios)
-
-# crear grafico de localización 
-
-#restuarantes
-ggplot()+
-  geom_sf(data=puntos_restaurantes)+
+distancia_mall <- ggplot(bd, aes(x = distancia_mall)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a un centro comercial en metros", y = "Cantidad",
+       title = "Distribución de la distancia a un centro comercial") +
   theme_bw()
-#parques
-ggplot()+
-  geom_sf(data=puntos_parques)+
-  theme_bw()
-#estaciones
-ggplot()+
-  geom_sf(data=puntos_estaciones)+
-  theme_bw()
-#mall
-ggplot()+
-  geom_sf(data=puntos_mall)+
-  theme_bw()
+ggplotly(distancia_mall)
 #ciclovias
-ggplot()+
-  geom_sf(data=puntos_ciclovia)+
+distancia_ciclovia <- ggplot(bd, aes(x = distancia_ciclovias)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a una ciclovia en metros", y = "Cantidad",
+       title = "Distribución de la distancia a una ciclovia") +
   theme_bw()
-#servicios
-ggplot()+
-  geom_sf(data=puntos_servicios)+
+ggplotly(distancia_ciclovia)
+# centro servicios
+distancia_servicios<- ggplot(bd, aes(x = distancia_centro_servicios)) +
+  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
+  labs(x = "Distancia mínima a centros de servicio en metros", y = "Cantidad",
+       title = "Distribución de la distancia a centro de servicios") +
   theme_bw()
+ggplotly(distancia_servicios)
+
+

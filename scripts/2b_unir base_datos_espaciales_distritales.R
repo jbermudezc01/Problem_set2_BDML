@@ -1,3 +1,13 @@
+# Al final del codigo sale una base de datos juntada con la que sale de 02_limpieza_datos.R
+if(0){
+  # unir variables construidas con bases de datos espaciales de bogotá 
+  # cargar datos de variables espaciales
+  ve <- read.csv("https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/variables_espaciales.csv")
+  # unir a bd 
+  df <- merge(bd, ve, by = "property_id")
+}
+
+
 # creación de nuevos predictores con bases de datos espaciales de Bogotá
 
 ## limpieza y transformación de datos ##
