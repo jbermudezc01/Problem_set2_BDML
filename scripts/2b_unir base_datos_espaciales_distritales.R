@@ -53,14 +53,10 @@ localidades <- st_read(paste0(datos.bogota,'localidades_bogota/Loca.shp')) # Loc
 load(paste0(stores,'Datos_limpios.RData'))
 # Al cargar 'Datos_limpios.RData', obtenemos una base de datos que se llama bd
 
-# Revisar codigo
-
-# convertir base de datos del taller en objeto sf 
- 
+# Convertir base de datos del taller en objeto sf 
 bd <- st_as_sf(bd, coords = c("lon","lat"), crs = 4326)
 
-# identificar el tipo de geometria 
-
+# Identificar el tipo de geometria 
 geom_type <- st_geometry_type(localidades)
 print(table(geom_type))
 
