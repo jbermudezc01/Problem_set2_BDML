@@ -3,21 +3,17 @@
 # Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
 ##########################################################
 
-## limpieza y transformación de datos ##
-
-#Limpieza area de trabajo 
-rm(list=ls())
+# Limpiar environment -----------------------------------------------------
+rm(list = ls())
 cat('\014')
 
-# cargar paquetes 
-install.packages("pacman")
-library(pacman)
-# cargar librerias 
+# Librerias ---------------------------------------------------------------
+require(pacman)
 p_load(tidyverse, # Manipular dataframes
        rio, # Importar datos fácilmente
        plotly, # Gráficos interactivos
        leaflet, # Mapas interactivos
-       rgeos, # Calcular centroides de un polígono
+       # rgeos, # ya no se encuentra en el CRAN, por buenas practicas no se utilizara
        units, # unidades
        sf, # Leer/escribir/manipular datos espaciales
        osmdata, # Obtener datos de OpenStreetMap (OSM)
@@ -25,99 +21,25 @@ p_load(tidyverse, # Manipular dataframes
        randomForest, # Modelos de bosque aleatorio
        rattle, # Interfaz gráfica para el modelado de datos
        spatialsample,
-       xgboost,
-       scals) # Muestreo espacial para modelos de aprendizaje automático
+       xgboost, # Muestreo espacial para modelos de aprendizaje automático
+       tmaptools,
+       terra) 
 
-# cargar base de datos 
+# Directorios -------------------------------------------------------------
+stores <- paste0(getwd(),'/stores/') # Directorio de base de datos
+views  <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
 
-bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/bd.csv')
-View(bd)
+# Lectura base de datos ---------------------------------------------------
+raw.bd <- read.csv(paste0(stores,'raw_complete_base.csv'))
 
 # identificar variables de bd 
-
-str(bd)
+str(raw.bd)
 
 # seleccinamos variables de interes
-
-bd <- bd %>%
+bd <- raw.bd %>%
   select(-city,-operation_type,-title)
 
-# Identificamos la distribución de las variables de interés
-
-# tipo de propiedad
-
-bd %>% count(property_type)
-
-# descripción de la variable price 
-
-# convertir variable a log para escalar graficos 
-
-bd <- bd%>%
-  mutate(log_price=log(price))
-
-# resumen de la distibución de la variable escalado a $
-
-summary(bd$price) %>%
-  as.matrix() %>%
-  as.data.frame()%>%
-  mutate(V1 = scales::dollar(V1))
-
-# hstrograma  estandarizado en $ 
-
-dist_precio <- ggplot(bd, aes(x = price)) +
-  geom_histogram(fill = "darkblue", alpha = 0.5) +
-  labs(x = "price", y = "Cantidad") +
-  scale_x_log10(labels = scales::dollar)+
-theme_bw()
-ggplotly(dist_precio)
-
-# relación entre precios y el tipo de propiedad 
-
-ggplot(bd, aes(x = price))+
-  geom_freqpoly(aes(color = property_type), binwidth = 5000, linewidth = 0.75) +
-  scale_x_continuous(labels = scales::dollar_format()) 
-
-# relación del precio y el número de habitaciones 
-
-ggplot(bd, aes(x = rooms, y = price)) + 
-  geom_boxplot(aes(group = cut_width(rooms, 0.1)))
-
-# relación del precio y el número de baños 
-
-ggplot(bd, aes(x = bathrooms, y = price)) + 
-  geom_boxplot(aes(group = cut_width(bathrooms, 0.1)))
-
-
-# verificamos valores faltantes 
-
-# Calcular cantidad y porcentaje de NA por columna
-
-resumen_na <- bd %>%
-  summarise(across(everything(),
-                   list(cantidad_NA = ~sum(is.na(.)),
-                        porcentaje_NA = ~mean(is.na(.)) * 100))) %>%
-  pivot_longer(everything(),
-               names_to = c("variable", ".measure"),
-               names_pattern = "(.*)_(.*)")
-print(resumen_na, n = Inf)
-
-# tratamos los valores faltantes en las variables roomms y bathrooms
-
-# identificamos la moda de rooms y bathromms
-bd %>%
-  count(rooms)  
-bd %>%
-  count(bathrooms)
-
-# Imputamos la moda 
-bd <- bd %>%
-  mutate(rooms = replace_na(rooms, 3), 
-         bathrooms = replace_na(bathrooms, 2))
-         
-# Tratamiento de la variable description 
-
-# normalizar el texto 
-
+# Tratar la variable description ------------------------------------------
 # Todo en minuscula
 bd <- bd %>%
   mutate(description = str_to_lower(description))
@@ -131,117 +53,124 @@ bd <- bd %>%
 bd <- bd %>%
   mutate(description = str_trim(gsub("\\s+", " ", description)))
 
-# creamos variables a partir del texto 
+# Valores faltantes -------------------------------------------------------
+# Calcular cantidad y porcentaje de NA por columna
+# Primero vemos la cantidad
+apply(bd, 2, function(x) sum(is.na(x)))
+# Ahora el porcentaje
+apply(bd, 2, function(x) round(sum(is.na(x)/length(x))*100,2))
+# Vemos que las variables mas problematicas van a ser <surface_total>, <surface_covered>, <rooms> y <bathrooms>. Por lo que vamos a intentar encontrar maneras para 
+# completar los NA.
 
-# crear la varibale piso 
+# En primer lugar, analizando la variable <surface_total> encontramos una propiedad que puede ser problematica en el momento de ver el MAE de prueba
+# ya que es una finca de 108.800m2 que se encuentra cerca a Medellin. Se procede a eliminar esta observacion de los datos
+bd <- bd[-which.max(bd$surface_total),]
 
-# primera mutación
+# Para tratar los valores faltantes de <bathrooms> y <rooms> es importante ver que <bedrooms> si esta completa. Por lo que una buena idea seria imputar la moda
+# dependiendo del numero de alcobas que tenga el apto/casa.
+# Por ejemplo, supongamos que la moda de banos para los apartamentos que tienen 4 alcobas sea 3, entonces esa moda sera imputada por aquellos aptos de 4 alcobas
+# que tengan valor faltante.
+# Lo anterior se va a realizar para todos los valores de numeros de alcobas, y para las dos variables que faltan, es decir <bathrooms> y <rooms>
+moda <- function(x) {
+  return(as.numeric(names(which.max(table(x)))))
+}
+
+# Imputar variables con la moda 
+bd <- bd %>%
+  group_by(bedrooms) %>%
+  mutate(bathrooms = ifelse(is.na(bathrooms), moda(bathrooms), bathrooms)) %>%
+  mutate(rooms = ifelse(is.na(rooms), moda(rooms),rooms)) %>% 
+  ungroup()
+
+# Creacion de variables segun <description> -------------------------------
+# Variable piso
 bd <- bd %>%
   mutate(piso_info= str_extract(description, "(\\w+|\\d+) piso (\\w+|\\d+)"))
 
-# transformación de número escritos a númericos 
-
-numeros_escritos <- c("uno|primero|primer", "dos|segundo|segund", "tres|tercero|tercer", "cuatro|cuarto", "cinco|quinto", "seis|sexto", "siete|septimo", "ocho|octavo", "nueve|noveno", "diez|decimo|dei")
-numeros_numericos <- as.character(1:10)
+# Transformación de número escritos a númericos 
+numeros_escritos <- c("uno|primero|primer", "dos|segundo|segund", "tres|tercero|tercer", "cuatro|cuarto", 
+                      "cinco|quinto", "seis|sexto", "siete|septimo|sptimo", "ocho|octavo", "nueve|noveno", 
+                      "diez|decimo|dei|dcimo",'once','doce','trece','catorce','quince','dieciseis','diecisiete',
+                      'diecioho','diecinueve','veinte')
+numeros_numericos <- as.character(1:20)
 bd<- bd %>%
   mutate(piso_info = str_replace_all(piso_info, setNames(numeros_numericos,numeros_escritos)))
 
-# extracción de números 
+# Extracción de números 
 bd<- bd %>%
   mutate(piso_numerico = as.integer(str_extract(piso_info, "\\d+")))
 
-#limpieza de datos 
+# Limpieza de datos del piso, ya que hay muchos outliers 
 bd <- bd %>%
   mutate(piso_numerico = ifelse(piso_numerico > 20, NA, piso_numerico))
 
-# imputar valores faltantes de esta variable 
+# Imputar valores faltantes segun el tipo de propiedad 
+bd2 <- bd %>%
+  group_by(property_type) %>%
+  mutate(piso_numerico = ifelse(is.na(piso_numerico), moda(piso_numerico), piso_numerico)) %>%
+  ungroup()
 
-# moda de los apartamentos 
-bd %>%
-  filter(property_type == "Apartamento") %>%
-  count(piso_numerico) # 2 piso 
-
-# moda de casas 
-
-bd %>%
-  filter(property_type == "Casa") %>%
-  count(piso_numerico) # 1 piso 
-
-# reemplazamos 1 
-
-bd <- bd %>%
-  mutate(piso_numerico = replace_na(piso_numerico, 2))
-
-# variable parqueadero 
+# Variable de parqueadero 
 bd <- bd %>%
   mutate(parqueadero = as.numeric(grepl("parqueadero|garaje", description)))
 bd %>%
   count(parqueadero)
 
 # variable terraza 
-  bd <- bd %>%
+bd <- bd %>%
   mutate(terraza = as.numeric(grepl("terraza|balcon", description, ignore.case = TRUE)))
-  bd %>%
+bd %>%
     count(terraza)
   
-# variable ascensor 
+# variable Ascensor 
 bd <- bd %>%
   mutate(ascensor = as.numeric(grepl("ascensor", description)))
 bd %>%
   count(ascensor)
+
+# Variable vigilancia
+bd <- bd %>%
+  mutate(vigilancia = as.numeric(grepl("seguridad|vigilancia|porteria", description)))
 bd %>%
   count(vigilancia)
 
-# variable deposito
-
+# Variable deposito
 bd <- bd %>%
   mutate(deposito = as.numeric(grepl("bodega|deposito", description, ignore.case = TRUE)))
-
 bd %>%
   count(deposito)
 
-# variable vigilancia
-
-bd <- bd %>%
-  mutate(vigilancia = as.numeric(grepl("seguridad|vigilancia|porteria", description, ignore.case = TRUE)))
-
-bd %>%
-  count(vigilancia)
-
 # variable de cocina integral
-
 bd <- bd %>%
   mutate(cocina_integral = as.numeric(grepl("cocina integral", description)))
-
 bd %>%
   count(cocina_integral)
 
 # variable piso laminado 
-
 bd <- bd %>%
   mutate(piso_laminado = as.numeric(grepl("piso laminado", description)))
 bd %>%
   count(piso_laminado)
 
-# transformar variables nuemricas binarias a cetegoricas 
+# Transformacion de variables ---------------------------------------------
+
+# Transformar variables numericas binarias a categoricas 
 
 #mutación de factores
 bd<-bd %>% 
-  mutate(parqueadero=factor(parqueadero,levels=c(0,1),labels=c("no tine","Si tiene")),
-         terraza=factor(terraza,levels=c(0,1),labels=c("no tiene", "si tiene")),
-         ascensor=factor(ascensor,levels=c(0,1),labels=c("no tiene", "si tiene")),
-         deposito=factor(deposito,levels=c(0,1),labels=c("no tiene","si tiene")),
-         vigilancia=factor(vigilancia,levels=c(0,1),labels=c("no tiene","si tiene")),
-         cocina_integral=factor(cocina_integral,levels=c(0,1),labels=c("no tiene","si tiene")),
-         piso_laminado=factor(piso_laminado,levels=c(0,1),labels = c("no tiene", "si tiene")),
-         property_type = as.factor(property_type))
+  mutate(parqueadero     = factor(parqueadero,levels=c(0,1),labels=c("No","Si")),
+         terraza         = factor(terraza,levels=c(0,1),labels=c("No", "Si")),
+         ascensor        = factor(ascensor,levels=c(0,1),labels=c("No", "Si")),
+         deposito        = factor(deposito,levels=c(0,1),labels=c("No","Si")),
+         vigilancia      = factor(vigilancia,levels=c(0,1),labels=c("No","Si")),
+         cocina_integral = factor(cocina_integral,levels=c(0,1),labels=c("No","Si")),
+         piso_laminado   = factor(piso_laminado,levels=c(0,1),labels = c("No", "Si")),
+         property_type   = as.factor(property_type))
                           
-# creación de variables espaciales #
+# Creacion Variables espaciales ----------------------------------------------------
 
-# definir la ubicación geografica de bogotá 
-
+# Ubicación geografica de bogotá 
 bogota <- opq(bbox = getbb ("Bogotá Colombia"))
-bogota
 
 # tomamos nuestros datos geoespaciales y los convertimos al formato sf (simple features)
 db_sf <- st_as_sf(bd, coords = c("lon", "lat")) 
@@ -249,17 +178,22 @@ db_sf <- st_as_sf(bd, coords = c("lon", "lat"))
 # Especificamos el sistema de coordenadas
 st_crs(db_sf) <- 4326
 
-# identificar categorias 
-
+# Identificar categorias 
 available_features() %>% 
   head(500)
 
-# extraer los datos abiertos para cada categoria 
+# Extraer los datos abiertos para cada categoria 
 
-# restaurantes
+# Restaurantes
 restaurantes <- bogota %>%
   add_osm_feature(key = "amenity", value= "restaurant")%>%
   osmdata_sf()
+
+leaflet() %>%
+  addTiles() %>%
+  addCircles(lng = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[1]))), 
+             lat = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[2]))))
+
 #parques 
 parques <- opq( 
   bbox = getbb("Bogotá Colombia")) %>% 
