@@ -23,7 +23,8 @@ p_load(tidyverse, # Manipular dataframes
        spatialsample,
        xgboost, # Muestreo espacial para modelos de aprendizaje automático
        tmaptools,
-       terra) 
+       terra,
+       geojsonR) 
 
 # Directorios -------------------------------------------------------------
 stores <- paste0(getwd(),'/stores/') # Directorio de base de datos
@@ -196,284 +197,121 @@ st_crs(db_sf) <- 4326
 available_features() %>% 
   head(500)
 
-# Extraer los datos abiertos para cada categoria 
+# Extraer datos OSM -------------------------------------------------------
 
+datos.osm <- list()
 # Restaurantes
-restaurantes <- bogota %>%
+datos.osm[[1]] <- bogota %>%
   add_osm_feature(key = "amenity", value= "restaurant")%>%
   osmdata_sf()
 
 # Parques 
-parques <- opq( 
-  bbox = getbb("Bogotá Colombia")) %>% 
+datos.osm[[2]] <- bogota %>% 
   add_osm_feature(key = "leisure" , value = "park")%>%
   osmdata_sf()
 
-# Estaciones de buses
-estaciones <- bogota%>%
-  add_osm_feature(key = "public_transport", value= "platform")%>%
-  osmdata_sf()
-
 # Mall
-mall <-  bogota%>%
+datos.osm[[3]] <-  bogota %>%
   add_osm_feature(key = "shop", value= "mall")%>%
   osmdata_sf()
 
 # Ciclovias 
-ciclovias <- bogota%>%
+datos.osm[[4]] <- bogota %>%
   add_osm_feature(key = "highway", value= "cycleway")%>%
   osmdata_sf()
 
 # centro urbanos de servicios
-centro_servicios <- bogota %>%
+datos.osm[[5]] <- bogota %>%
   add_osm_feature(key = "landuse", value= "commercial")%>%
   osmdata_sf()
 
-# visulizar su localización 
+names(datos.osm) <- c('Restaurantes','Parques', 'Mall', 'Ciclovias', 'Centro urbanos de servicios')
 
-# crear puntos
+# Geometria variables OSM -------------------------------------------------
+geometria.osm <- lapply(datos.osm, function(x) x$osm_polygons %>% select(osm_id, name))
 
-#restaurantes
-puntos_restaurantes <- restaurantes$osm_points
-head(puntos_restaurantes)
-#parques
-puntos_parques <- parques$osm_points
-head(puntos_parques)
-#estaciones
-puntos_estaciones <-estaciones$osm_points
-head(puntos_estaciones)
-#mall
-puntos_mall <- mall$osm_points
-head(puntos_mall)
-#ciclovia
-puntos_ciclovia <- ciclovias$osm_points
-head(puntos_ciclovia)
-# centros_servicios
-puntos_servicios <- centro_servicios$osm_points
-head(puntos_servicios)
+# Calculamos los centroides
+centroides.osm <- lapply(geometria.osm, function(x){
+  elementos.st <- st_as_sf(as(x$geometry,'Spatial'))
+  centroides   <- st_centroid(elementos.st)
+  return(centroides)
+})
 
-# crear grafico de localización 
+coordenadas.x.centroides <- lapply(centroides.osm, function(x) unlist(purrr::map(x$geometry, ~.x[1])))
+coordenadas.y.centroides <- lapply(centroides.osm, function(x) unlist(purrr::map(x$geometry, ~.x[2])))
 
-#restuarantes
-ggplot()+
-  geom_sf(data=puntos_restaurantes)+
-  theme_bw()
-#parques
-ggplot()+
-  geom_sf(data=puntos_parques)+
-  theme_bw()
-#estaciones
-ggplot()+
-  geom_sf(data=puntos_estaciones)+
-  theme_bw()
-#mall
-ggplot()+
-  geom_sf(data=puntos_mall)+
-  theme_bw()
-#ciclovias
-ggplot()+
-  geom_sf(data=puntos_ciclovia)+
-  theme_bw()
-#servicios
-ggplot()+
-  geom_sf(data=puntos_servicios)+
-  theme_bw()
+# Matrices de distancias para cada observacion a los centroides en <centroides.osm>
+matrix.distancias.osm  <- lapply(centroides.osm, function(x) st_distance(x=db_sf, y =x))
+  
+# Distancias minimas 
+distancias.minimas.osm <- lapply(matrix.distancias.osm, function(x) apply(x,1,min))
+  
+# Agregar las distancias minimas a la base de datos
+name.cols <- c('restaurante','parques', 'mall', 'ciclovias', 'centro_servicios')
+for(i in seq_along(distancias.minimas.osm)){
+  nombre.columna <- paste0('distancia_',name.cols[i])
+  bd <- bd %>% mutate(!!nombre.columna := distancias.minimas.osm[[i]])
+}
 
-# rescatamos la geometria 
+# Transmilenio y SITP ------------------------------------------------------------
+# Para los datos de transmilenio y SITP se confia en los datos abiertos de transmilenio, y usamos la API que ofrecen ellos en la pagina oficial
+# La API se encuentra en formato geojson por lo que usamos el paquete <geojsonR> y generamos dataframes con las longitudes y latitudes de las estaciones para 
+# luego medir la distancia 
+transmilenio           <- FROM_GeoJson(url_file_string = "https://gis.transmilenio.gov.co/arcgis/rest/services/Troncal/consulta_estaciones_troncales/FeatureServer/1/query?outFields=*&where=1%3D1&f=geojson")
+geometria.transmilenio <- purrr::map_df(transmilenio$features, ~.x$properties[c('nombre_estacion','latitud_estacion','longitud_estacion')])
 
-# restaurantes
-restaurantes_geometria <- restaurantes$osm_polygons%>%
-  select(osm_id, name)
-#parques
-parques_geometria <- parques$osm_polygons%>%
-  select(osm_id, name)
-#estaciones
-estaciones_geometria <- estaciones$osm_polygons%>%
-  select(osm_id, name)
-#mall
-mall_geometria <- mall$osm_polygons%>%
-  select(osm_id, name)
-#ciclovias
-ciclovia_geometria <- ciclovias$osm_polygons%>%
-  select(osm_id, name)
-#servicios
-servicios_geometria <- centro_servicios$osm_polygons%>%
-  select(osm_id, name)
+sitp                   <- FROM_GeoJson(url_file_string = "https://gis.transmilenio.gov.co/arcgis/rest/services/Zonal/consulta_paraderos/MapServer/0/query?outFields=*&where=1%3D1&f=geojson")
+geometria.sitp         <- purrr::map_df(sitp$features, ~.x$properties[c('nombre','latitud','longitud')])
 
-# calculamos el centroide 
+# Volvemos a <geometria.transmilenio> y <geometria.sitp> en objetos sf con crs igual a <db_sf>
+transmilenio.sf <- st_as_sf(x = geometria.transmilenio, coords = c('longitud_estacion','latitud_estacion'),
+                            crs = st_crs(db_sf))
+sitp.sf         <- st_as_sf(x = geometria.sitp, coords = c('longitud','latitud'),crs = st_crs(db_sf))
 
-#restaurantes
-centroides_restaurantes <- gCentroid( 
-  as(restaurantes_geometria$geometry, "Spatial"),  
-  byid = T)
-#parques
-centroides_parques <- gCentroid( 
-  as(parques_geometria$geometry, "Spatial"),  
-  byid = T)
-#estaciones 
-centroides_estaciones <- gCentroid( 
-  as(estaciones_geometria$geometry, "Spatial"),  
-  byid = T)
-#mall
-centroides_mall <- gCentroid( 
-  as(mall_geometria$geometry, "Spatial"),  
-  byid = T)
-#ciclovias
-centroides_ciclovias<- gCentroid( 
-  as(ciclovia_geometria$geometry, "Spatial"),  
-  byid = T)
-#servicios 
-centroides_servicios <- gCentroid( 
-  as(servicios_geometria$geometry, "Spatial"),  
-  byid = T)
+# Matrices de distancias para transmilenio y sitp
+matrix.distancias.tm    <- st_distance(x=db_sf, y = transmilenio.sf)
+matrix.distancias.sitp  <- st_distance(x=db_sf, y = sitp.sf)
 
-# convertimos los centroides a formato sf(simple features)
+# Distancias minimas y agregar a base de datos
+bd$distancia_tm   <- apply(matrix.distancias.tm, 1, min) 
+bd$distancia_sitp <- apply(matrix.distancias.sitp, 1, min)
 
-#restaurantes
-centroides_restaurantes_sf <- st_as_sf(centroides_restaurantes, coords = c("x", "y")) 
-#parques
-centroides_parques_sf <- st_as_sf(centroides_parques, coords = c("x", "y")) 
-#estaciones
-centroides_estaciones_sf <- st_as_sf(centroides_estaciones, coords = c("x", "y")) 
-#mall
-centroides_mall_sf <- st_as_sf(centroides_mall, coords = c("x", "y")) 
-#ciclovias
-centroides_ciclovias_sf <- st_as_sf(centroides_ciclovias, coords = c("x", "y"))
-#servicios
-centroides_servicios_sf <- st_as_sf(centroides_servicios, coords = c("x", "y"))
-
-# Calculamos las distancias para cada inmueble
-
-#restaurantes
-dist_restaurante<- st_distance(x = db_sf, y = centroides_restaurantes_sf)
-#parques 
-dist_parques <- st_distance(x = db_sf, y = centroides_parques_sf)
-#estaciones 
-dist_estaciones <- st_distance(x = db_sf, y = centroides_estaciones_sf)
-#mall
-dist_mall <- st_distance(x = db_sf, y = centroides_mall_sf)
-#ciclovias
-dist_ciclovia <- st_distance(x = db_sf, y = centroides_ciclovias_sf)
-#servicios
-dist_servicios <- st_distance(x = db_sf, y = centroides_servicios_sf)
-
-# Encontramos la distancia mínima a un parque
-
-#restaurantes
-dist_min_restaurante<- apply( 
-  dist_restaurante, 1, 
-  min) 
-#parques
-dist_min_parque<- apply( 
-  dist_parques, 1, 
-  min)
-#estaciones
-dist_min_estaciones <- apply( 
-  dist_estaciones, 1, 
-  min)
-#mall
-dist_min_mall <- apply( 
-  dist_mall, 1, 
-  min)
-#ciclovias
-dist_min_ciclovias <- apply( 
-  dist_ciclovia, 1, 
-  min)
-#servicios
-dist_min_servicios <- apply(
-  dist_servicios, 1,
-  min)
-
-# La agregamos como variablea nuestra base de datos original 
-
-bd <- bd %>% 
-  mutate(distancia_restaurante = dist_min_restaurante,
-         distancia_parques = dist_min_parque,
-         distancia_estaciones_tp = dist_min_estaciones,
-         distancia_mall= dist_min_mall,
-         distancia_ciclovias =dist_min_ciclovias,
-         distancia_centro_servicios = dist_min_servicios)
-
-# creamos variables distancia polinomicas 
+# Variables de distancia polinomicas
 
 bd <- bd%>%
-  mutate(distancia_parques2 = distancia_parques^2,
+  mutate(distancia_parques2     = distancia_parques^2,
          distancia_restaurante2 = distancia_restaurante^2,
-         distancia_estaciones_tp2 = distancia_estaciones_tp^2,
-         distancia_mall2 = distancia_mall^2,
-         distancia_ciclovia2 = distancia_ciclovias^2,
-         distancia_servicios2= distancia_centro_servicios^2,
-         distancia_parques3 = distancia_parques^3,
+         distancia_sitp2        = distancia_sitp^2,
+         distancia_tm2          = distancia_tm^2,
+         distancia_mall2        = distancia_mall^2,
+         distancia_ciclovias2   = distancia_ciclovias^2,
+         distancia_servicios2   = distancia_centro_servicios^2,
+         distancia_parques3     = distancia_parques^3,
          distancia_restaurante3 = distancia_restaurante^3,
-         distancia_estaciones_tp3 = distancia_estaciones_tp^3,
-         distancia_mall3 = distancia_mall^3,
-         distancia_ciclovia3 = distancia_ciclovias^3,
-         ditancia_servecios3= distancia_centro_servicios^3,
-         distancia_parques4 = distancia_parques^4,
+         distancia_mall3        = distancia_mall^3,
+         distancia_ciclovias3   = distancia_ciclovias^3,
+         ditancia_servicios3    = distancia_centro_servicios^3,
+         distancia_sitp3        = distancia_sitp^3,
+         distancia_tm3          = distancia_tm^3,
+         distancia_parques4     = distancia_parques^4,
          distancia_restaurante4 = distancia_restaurante^4,
-         distancia_estaciones_tp4 = distancia_estaciones_tp^4,
-         distancia_mall4 = distancia_mall^4,
-         distancia_ciclovia4 = distancia_ciclovias^4,
-         ditancia_servecios4= distancia_centro_servicios^4,
-         distancia_parques5 = distancia_parques^5,
+         distancia_mall4        = distancia_mall^4,
+         distancia_ciclovias4   = distancia_ciclovias^4,
+         ditancia_servicios4    = distancia_centro_servicios^4,
+         distancia_sitp4        = distancia_sitp^4,
+         distancia_tm4          = distancia_tm^4,
+         distancia_parques5     = distancia_parques^5,
          distancia_restaurante5 = distancia_restaurante^5,
-         distancia_estaciones_tp5 = distancia_estaciones_tp^5,
-         distancia_mall5 = distancia_mall^5,
-         distancia_ciclovia5 = distancia_ciclovias^5,
-         ditancia_servecios5= distancia_centro_servicios^5)
-
-# distribución de la variable 
-
-#restaurante
-distancia_restaurantes <- ggplot(bd, aes(x = distancia_restaurante)) +
-  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
-  labs(x = "Distancia mínima a un restaurante en metros", y = "Cantidad",
-       title = "Distribución de la distancia a restaurantes") +
-  theme_bw()
-ggplotly(distancia_restaurantes)
-#parques
-distancia_parques <- ggplot(bd, aes(x = distancia_parques)) +
-  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
-  labs(x = "Distancia mínima a un parque en metros", y = "Cantidad",
-       title = "Distribución de la distancia a parques") +
-  theme_bw()
-ggplotly(distancia_parques)
-#estaciones
-distancia_estaciones <- ggplot(bd, aes(x = distancia_estaciones_tp)) +
-  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
-  labs(x = "Distancia mínima a una estación de transporte público en metros", y = "Cantidad",
-       title = "Distribución de la distancia a una estación de transporte público") +
-  theme_bw()
-ggplotly(distancia_estaciones)
-#mall
-distancia_mall <- ggplot(bd, aes(x = distancia_mall)) +
-  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
-  labs(x = "Distancia mínima a un centro comercial en metros", y = "Cantidad",
-       title = "Distribución de la distancia a un centro comercial") +
-  theme_bw()
-ggplotly(distancia_mall)
-#ciclovias
-distancia_ciclovia <- ggplot(bd, aes(x = distancia_ciclovias)) +
-  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
-  labs(x = "Distancia mínima a una ciclovia en metros", y = "Cantidad",
-       title = "Distribución de la distancia a una ciclovia") +
-  theme_bw()
-ggplotly(distancia_ciclovia)
-# centro servicios
-distancia_servicios<- ggplot(bd, aes(x = distancia_centro_servicios)) +
-  geom_histogram(bins = 50, fill = "darkblue", alpha = 0.4) +
-  labs(x = "Distancia mínima a centros de servicio en metros", y = "Cantidad",
-       title = "Distribución de la distancia a centro de servicios") +
-  theme_bw()
-ggplotly(distancia_servicios)
-
-# unir variables construidas con bases de datos espaciales de bogotá 
-# cargar datos de variables espaciales
-ve <- read.csv("https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/variables_espaciales.csv")
-# unir a bd 
-df <- merge(bd, ve, by = "property_id")
+         distancia_mall5        = distancia_mall^5,
+         distancia_ciclovias5   = distancia_ciclovias^5,
+         ditancia_servicios5    = distancia_centro_servicios^5,
+         distancia_sitp5        = distancia_sitp^5,
+         distancia_tm5          = distancia_tm^5)
 
 
-# exportar a csv
-
+# Exportar a csv y .RData -------------------------------------------------
 write_csv(df, file = "/Users/apple/Documents/GitHub/Problem_set2_BDML/stores/base_datos_tratada.csv")
+save(bd, geometria.osm, coordenadas.x.centroides, coordenadas.y.centroides, file = paste0(stores,'Datos_limpios.RData'))
+
+# En //Datos_limpios.RData van a guardarse la base de datos bd, la geometria.osm, coordenadas.x.centroides y 
+# coordenadas.y.centroides
