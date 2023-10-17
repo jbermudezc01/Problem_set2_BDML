@@ -1,5 +1,5 @@
 ##########################################################
-# Prediccion precios de vivienda
+# Union bases de datos
 # Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
 ##########################################################
 
