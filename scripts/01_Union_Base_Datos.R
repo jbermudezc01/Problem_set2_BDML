@@ -37,12 +37,12 @@ test  <- read_csv(paste0(stores,'test.csv'))
 # Etiquetas para test y train ---------------------------------------------
 # La etiqueta 2 sera para 'test'
 test <- test %>%
-  mutate(type_data = 2)%>%
+  mutate(type_data ='test')%>%
   select(type_data, everything())
 
 # La etiqueta 1 sera para 'train'
 train <- train%>%
-  mutate(type_data = 1)%>%
+  mutate(type_data = 'train')%>%
   select(type_data, everything())
 
 

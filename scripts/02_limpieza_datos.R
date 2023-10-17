@@ -105,7 +105,7 @@ bd <- bd %>%
   mutate(piso_numerico = ifelse(piso_numerico > 20, NA, piso_numerico))
 
 # Imputar valores faltantes segun el tipo de propiedad 
-bd2 <- bd %>%
+bd <- bd %>%
   group_by(property_type) %>%
   mutate(piso_numerico = ifelse(is.na(piso_numerico), moda(piso_numerico), piso_numerico)) %>%
   ungroup()
@@ -113,44 +113,30 @@ bd2 <- bd %>%
 # Variable de parqueadero 
 bd <- bd %>%
   mutate(parqueadero = as.numeric(grepl("parqueadero|garaje", description)))
-bd %>%
-  count(parqueadero)
 
 # variable terraza 
 bd <- bd %>%
   mutate(terraza = as.numeric(grepl("terraza|balcon", description, ignore.case = TRUE)))
-bd %>%
-    count(terraza)
-  
+
 # variable Ascensor 
 bd <- bd %>%
   mutate(ascensor = as.numeric(grepl("ascensor", description)))
-bd %>%
-  count(ascensor)
 
 # Variable vigilancia
 bd <- bd %>%
   mutate(vigilancia = as.numeric(grepl("seguridad|vigilancia|porteria", description)))
-bd %>%
-  count(vigilancia)
 
 # Variable deposito
 bd <- bd %>%
   mutate(deposito = as.numeric(grepl("bodega|deposito", description, ignore.case = TRUE)))
-bd %>%
-  count(deposito)
 
 # variable de cocina integral
 bd <- bd %>%
   mutate(cocina_integral = as.numeric(grepl("cocina integral", description)))
-bd %>%
-  count(cocina_integral)
 
 # variable piso laminado 
 bd <- bd %>%
   mutate(piso_laminado = as.numeric(grepl("piso laminado", description)))
-bd %>%
-  count(piso_laminado)
 
 # Transformacion de variables ---------------------------------------------
 
@@ -189,28 +175,27 @@ restaurantes <- bogota %>%
   add_osm_feature(key = "amenity", value= "restaurant")%>%
   osmdata_sf()
 
-leaflet() %>%
-  addTiles() %>%
-  addCircles(lng = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[1]))), 
-             lat = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[2]))))
-
-#parques 
+# Parques 
 parques <- opq( 
   bbox = getbb("Bogotá Colombia")) %>% 
   add_osm_feature(key = "leisure" , value = "park")%>%
   osmdata_sf()
-# estaciones de buses
+
+# Estaciones de buses
 estaciones <- bogota%>%
   add_osm_feature(key = "public_transport", value= "platform")%>%
   osmdata_sf()
-# mall
+
+# Mall
 mall <-  bogota%>%
   add_osm_feature(key = "shop", value= "mall")%>%
   osmdata_sf()
-#ciclovias 
+
+# Ciclovias 
 ciclovias <- bogota%>%
   add_osm_feature(key = "highway", value= "cycleway")%>%
   osmdata_sf()
+
 # centro urbanos de servicios
 centro_servicios <- bogota %>%
   add_osm_feature(key = "landuse", value= "commercial")%>%

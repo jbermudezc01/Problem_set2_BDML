@@ -32,3 +32,60 @@ ggplot(bd, aes(x = rooms, y = price)) +
 # Relación del precio y el número de baños 
 ggplot(bd, aes(x = bathrooms, y = price)) + 
   geom_boxplot(aes(group = cut_width(bathrooms, 0.1)))
+
+# Graficas espaciales -----------------------------------------------------
+
+leaflet() %>%
+  addTiles() %>%
+  addCircles(lng = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[1]))), 
+             lat = as.numeric(unlist(purrr::map(restaurantes$osm_points$geometry, ~.x[2]))))
+
+# visulizar su localización 
+
+# crear puntos
+
+#restaurantes
+puntos_restaurantes <- restaurantes$osm_points
+head(puntos_restaurantes)
+#parques
+puntos_parques <- parques$osm_points
+head(puntos_parques)
+#estaciones
+puntos_estaciones <-estaciones$osm_points
+head(puntos_estaciones)
+#mall
+puntos_mall <- mall$osm_points
+head(puntos_mall)
+#ciclovia
+puntos_ciclovia <- ciclovias$osm_points
+head(puntos_ciclovia)
+# centros_servicios
+puntos_servicios <- centro_servicios$osm_points
+head(puntos_servicios)
+
+# crear grafico de localización 
+
+#restuarantes
+ggplot()+
+  geom_sf(data=puntos_restaurantes)+
+  theme_bw()
+#parques
+ggplot()+
+  geom_sf(data=puntos_parques)+
+  theme_bw()
+#estaciones
+ggplot()+
+  geom_sf(data=puntos_estaciones)+
+  theme_bw()
+#mall
+ggplot()+
+  geom_sf(data=puntos_mall)+
+  theme_bw()
+#ciclovias
+ggplot()+
+  geom_sf(data=puntos_ciclovia)+
+  theme_bw()
+#servicios
+ggplot()+
+  geom_sf(data=puntos_servicios)+
+  theme_bw()
