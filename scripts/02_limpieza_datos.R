@@ -197,8 +197,8 @@ db_sf <- st_as_sf(bd, coords = c("lon", "lat"))
 st_crs(db_sf) <- 4326
 
 # Identificar categorias 
-available_features() %>% 
-  head(500)
+available_features()
+
 
 # Extraer datos OSM -------------------------------------------------------
 
@@ -228,7 +228,47 @@ datos.osm[[5]] <- bogota %>%
   add_osm_feature(key = "landuse", value= "commercial")%>%
   osmdata_sf()
 
-names(datos.osm) <- c('Restaurantes','Parques', 'Mall', 'Ciclovias', 'Centro urbanos de servicios')
+
+#Amenity
+datos.osm[[6]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="hospital")%>%
+  osmdata_sf()
+
+datos.osm[[7]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="kindergarten")%>%
+  osmdata_sf()
+
+datos.osm[[8]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="school")%>%
+  osmdata_sf()
+
+datos.osm[[9]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="university")%>%
+  osmdata_sf()
+
+datos.osm[[10]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="stripclub")%>%
+  osmdata_sf()
+
+datos.osm[[11]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="swingerclub")%>%
+  osmdata_sf()
+
+datos.osm[[12]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="pub")%>%
+  osmdata_sf()
+
+datos.osm[[13]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="nightclub")%>%
+  osmdata_sf()
+
+datos.osm[[14]] <- bogota %>%
+  add_osm_feature(key = "amenity", value="police")%>%
+  osmdata_sf()
+
+names(datos.osm) <- c('Restaurantes','Parques', 'Mall', 'Ciclovias', 'Centro urbanos de servicios',
+                      'Hospitales','Jardines', 'Colegios','Universidades','Strippers','Swingers',
+                      'Bares', 'Clubes', 'Policia')
 
 # Geometria variables OSM -------------------------------------------------
 geometria.osm <- lapply(datos.osm, function(x) x$osm_polygons %>% select(osm_id, name))
@@ -250,7 +290,8 @@ matrix.distancias.osm  <- lapply(centroides.osm, function(x) st_distance(x=db_sf
 distancias.minimas.osm <- lapply(matrix.distancias.osm, function(x) apply(x,1,min))
   
 # Agregar las distancias minimas a la base de datos
-name.cols <- c('restaurante','parques', 'mall', 'ciclovias', 'centro_servicios')
+name.cols <- c('restaurante','parques', 'mall', 'ciclovias', 'centro_servicios','hospitales','jardines', 'colegios','universidades','strippers','swingers',
+               "bares", "clubes", "policia")
 for(i in seq_along(distancias.minimas.osm)){
   nombre.columna <- paste0('distancia_',name.cols[i])
   bd <- bd %>% mutate(!!nombre.columna := distancias.minimas.osm[[i]])
