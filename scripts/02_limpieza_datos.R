@@ -166,7 +166,10 @@ bd <- bd %>%
 
 bd$surface<-as.numeric(bd$surface)
 
-
+bd <- bd %>%
+  group_by(bedrooms) %>%
+  mutate(surface = ifelse(is.na(surface), mean(surface),surface))%>%
+  ungroup()
 # Transformacion de variables ---------------------------------------------
 
 # Transformar variables numericas binarias a categoricas 
