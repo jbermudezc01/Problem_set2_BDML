@@ -60,47 +60,41 @@ bd <- st_as_sf(bd, coords = c("lon","lat"), crs = 4326)
 geom_type <- st_geometry_type(localidades)
 print(table(geom_type))
 
-# hacer join espacial 
-
-#  corregir las geometrías inválidas
-
-area_construida_valid <- st_make_valid(area_construida)
+# Joint espacial ----------------------------------------------------------
+# Corregir las geometrias invalidas
+area_construida_valid  <- st_make_valid(area_construida)
 valor_referencia_valid <- st_make_valid(valor_referencia)
 cantidad_predios_valid <- st_make_valid(cantidad_predios)
-manzanas_valid <- st_make_valid(manzanas)
-localidades_valid <- st_make_valid(localidades)
+manzanas_valid         <- st_make_valid(manzanas)
+localidades_valid      <- st_make_valid(localidades)
 
-
-#  realizar la unión 
-
-# area superficie
+# Realizar la union
+# Area superficie
 bd <- st_join(bd, area_construida_valid, join = st_within)
 
 # valor catastral de refencia 
 bd <- st_join(bd, valor_referencia_valid, join = st_within)
 
-# cantidad de predios
+# Cantidad de predios
 bd <- st_join(bd,cantidad_predios_valid, join=st_within)
 
-# localidad 
-# convertir a sistema de coordenadas de bd 
+# Convertir a sistema de coordenadas de bd 
 bd <- st_transform(bd, crs = st_crs(localidades_valid))
-#unir base de datos 
+
+# Localidad
 bd <- st_join(bd,localidades_valid,join = st_within)
 
-# eliminar los valores duplicados 
+# Eliminar los valores que quedaron duplicados 
 bd <- bd %>% 
   distinct(property_id, geometry, .keep_all = TRUE)
 
-# limpiar base de datos 
-
+# Limpiar base de datos 
 bd <- bd %>%
   select(-c(OBJECTID,OBJECTID.x,OBJECTID.y,MANCODIGO.x,MANCODIGO.y,
             ANO.x,ANO.y,ANO,SHAPE_AREA.x,SHAPE_LEN.x,SHAPE_Area.x,SHAPE_Leng.x,
             SHAPE_AREA.y,SHAPE_LEN.y,SHAPE_Leng.y,SHAPE_Area.y,LocAAdmini,LocArea))
 
-# renombrar variables 
-
+# Renombrar variables 
 bd <- bd%>%
   rename(area_residencial_manzana = AREA_RESID,
          valor_catastral_referencia_2022 = V_REF,
@@ -109,13 +103,11 @@ bd <- bd%>%
          nombre_localidad = LocNombre,
          codigo_localidad = LocCodigo)
 
-# transformar a factor variable localidad 
+# Transformar a factor variable localidad 
 bd <- bd%>%
 mutate(nombre_localidad = as.factor(nombre_localidad))
 
-
-# identificar los NA para las variables agregadas
-
+# Identificar los NA para las variables agregadas
 bd %>% 
   summarise(
     na_count_area = sum(is.na(area_residencial_manzana)), # 37,7 %
@@ -125,7 +117,6 @@ bd %>%
     
 
 # Imputar NA por la media 
-
 bd <- bd %>%
   mutate(
     area_residencial_manzana = ifelse(is.na(area_residencial_manzana), mean(area_residencial_manzana, na.rm = TRUE), area_residencial_manzana),
