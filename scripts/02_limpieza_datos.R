@@ -199,79 +199,72 @@ st_crs(db_sf) <- 4326
 # Identificar categorias 
 available_features()
 
-
 # Extraer datos OSM -------------------------------------------------------
 
-datos.osm <- list()
-# Restaurantes
-datos.osm[[1]] <- bogota %>%
-  add_osm_feature(key = "amenity", value= "restaurant")%>%
-  osmdata_sf()
-
-# Parques 
-datos.osm[[2]] <- bogota %>% 
-  add_osm_feature(key = "leisure" , value = "park")%>%
-  osmdata_sf()
+datos.osm1 <- list()
 
 # Mall
-datos.osm[[3]] <-  bogota %>%
+datos.osm1[[1]] <-  bogota %>%
   add_osm_feature(key = "shop", value= "mall")%>%
   osmdata_sf()
 
 # Ciclovias 
-datos.osm[[4]] <- bogota %>%
+datos.osm1[[2]] <- bogota %>%
   add_osm_feature(key = "highway", value= "cycleway")%>%
   osmdata_sf()
 
 # centro urbanos de servicios
-datos.osm[[5]] <- bogota %>%
+datos.osm1[[3]] <- bogota %>%
   add_osm_feature(key = "landuse", value= "commercial")%>%
   osmdata_sf()
 
+nombres.datos.osm <- c('mall','cycleway','commercial')
+names(datos.osm1) <- nombres.datos.osm
 
-#Amenity
-datos.osm[[6]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="hospital")%>%
-  osmdata_sf()
+# Alternativa datos OSM iterando ------------------------------------------
 
-datos.osm[[7]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="kindergarten")%>%
-  osmdata_sf()
+# Se va a iterar a traves de todos los objetos en <amenity> y en <leisure>, y 
+# se van a guardar los objetos no vacios en una lista. 
+amenities <- available_tags('amenity')
+leisures   <- available_tags('leisure')
+amenities.leisures <- rbind(amenities, leisures)
+# Para evitar problemas con el codigo, se renombra el  <Value> de la primera fila, a first_aid_school
+amenities.leisures[1,'Value'] <- 'first_aid_school'
 
-datos.osm[[8]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="school")%>%
-  osmdata_sf()
+datos.osm2 <- list()
+names.osm2 <- list()
+indice <- 1
+for(k in 1:nrow(amenities.leisures)){
+  key <- as.character(amenities.leisures[k,'Key'])
+  datos.temp <- bogota %>%
+    add_osm_feature(key = key, 
+                    value= as.character(amenities.leisures[k,'Value']))%>%
+    osmdata_sf()
+  # Revisar si tiene datos geograficos. El elemento <datos.temp> tiene una matriz de poligonos
+  # que se accede con <$osm_polygons>, y si esa matriz tiene 0 filas, no se debe guardar porque no 
+  # hay informacion para Bogota
+  if(nrow(datos.temp$osm_polygons) == 0) next
+  
+  # Si tiene al menos un dato entonces el loop continua
+  datos.osm2[[indice]] <- datos.temp
+  # Aparte, es necesario agregar el nombre del amenity / leisure. La forma mas eficiente para acceder
+  # a ello es con el codigo en la siguiente linea
+  vgrepl <- Vectorize(grepl, 'pattern')
+  nombres.posibles  <- as.character(amenities.leisures$Value)[vgrepl(as.character(amenities.leisures$Value), datos.temp$overpass_call)]
+  # En <nombres.posibles> puede haber patrones como 'first_aid_school' y aparte 'school', pero la idea es solamente encontrar la llave unica, que 
+  # es aquel valor en <nombres.posibles> con el mayor numero de caracteres
+  names.osm2[[indice]] <- nombres.posibles[which.max(nchar(nombres.posibles))]
+  indice <- indice + 1
+}
+# Asignar los nombres
+names(datos.osm2) <- names.osm2
 
-datos.osm[[9]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="university")%>%
-  osmdata_sf()
-
-datos.osm[[10]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="stripclub")%>%
-  osmdata_sf()
-
-datos.osm[[11]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="swingerclub")%>%
-  osmdata_sf()
-
-datos.osm[[12]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="pub")%>%
-  osmdata_sf()
-
-datos.osm[[13]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="nightclub")%>%
-  osmdata_sf()
-
-datos.osm[[14]] <- bogota %>%
-  add_osm_feature(key = "amenity", value="police")%>%
-  osmdata_sf()
-
-names(datos.osm) <- c('Restaurantes','Parques', 'Mall', 'Ciclovias', 'Centro urbanos de servicios',
-                      'Hospitales','Jardines', 'Colegios','Universidades','Strippers','Swingers',
-                      'Bares', 'Clubes', 'Policia')
+# Juntar los dos objetos de datos de OSM, <datos.osm> y <datos.osm2>
+datos.osm         <- c(datos.osm1, datos.osm2)
+nombres.datos.osm <- names(datos.osm)
 
 # Geometria variables OSM -------------------------------------------------
-geometria.osm <- lapply(datos.osm, function(x) x$osm_polygons %>% select(osm_id, name))
+geometria.osm <- lapply(datos.osm, function(x) x$osm_polygons %>% select(osm_id))
 
 # Calculamos los centroides
 centroides.osm <- lapply(geometria.osm, function(x){
@@ -290,10 +283,8 @@ matrix.distancias.osm  <- lapply(centroides.osm, function(x) st_distance(x=db_sf
 distancias.minimas.osm <- lapply(matrix.distancias.osm, function(x) apply(x,1,min))
   
 # Agregar las distancias minimas a la base de datos
-name.cols <- c('restaurante','parques', 'mall', 'ciclovias', 'centro_servicios','hospitales','jardines', 'colegios','universidades','strippers','swingers',
-               "bares", "clubes", "policia")
 for(i in seq_along(distancias.minimas.osm)){
-  nombre.columna <- paste0('distancia_',name.cols[i])
+  nombre.columna <- paste0('distancia_',nombres.datos.osm[i])
   bd <- bd %>% mutate(!!nombre.columna := distancias.minimas.osm[[i]])
 }
 
