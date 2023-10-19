@@ -311,39 +311,6 @@ matrix.distancias.sitp  <- st_distance(x=db_sf, y = sitp.sf)
 bd$distancia_tm   <- apply(matrix.distancias.tm, 1, min) 
 bd$distancia_sitp <- apply(matrix.distancias.sitp, 1, min)
 
-# Variables de distancia polinomicas
-
-bd <- bd%>%
-  mutate(distancia_parques2     = distancia_parques^2,
-         distancia_restaurante2 = distancia_restaurante^2,
-         distancia_sitp2        = distancia_sitp^2,
-         distancia_tm2          = distancia_tm^2,
-         distancia_mall2        = distancia_mall^2,
-         distancia_ciclovias2   = distancia_ciclovias^2,
-         distancia_servicios2   = distancia_centro_servicios^2,
-         distancia_parques3     = distancia_parques^3,
-         distancia_restaurante3 = distancia_restaurante^3,
-         distancia_mall3        = distancia_mall^3,
-         distancia_ciclovias3   = distancia_ciclovias^3,
-         ditancia_servicios3    = distancia_centro_servicios^3,
-         distancia_sitp3        = distancia_sitp^3,
-         distancia_tm3          = distancia_tm^3,
-         distancia_parques4     = distancia_parques^4,
-         distancia_restaurante4 = distancia_restaurante^4,
-         distancia_mall4        = distancia_mall^4,
-         distancia_ciclovias4   = distancia_ciclovias^4,
-         ditancia_servicios4    = distancia_centro_servicios^4,
-         distancia_sitp4        = distancia_sitp^4,
-         distancia_tm4          = distancia_tm^4,
-         distancia_parques5     = distancia_parques^5,
-         distancia_restaurante5 = distancia_restaurante^5,
-         distancia_mall5        = distancia_mall^5,
-         distancia_ciclovias5   = distancia_ciclovias^5,
-         ditancia_servicios5    = distancia_centro_servicios^5,
-         distancia_sitp5        = distancia_sitp^5,
-         distancia_tm5          = distancia_tm^5)
-
-
 # Exportar a csv y .RData -------------------------------------------------
 write_csv(bd, file = paste0(stores,'base_datos_tratada.csv'))
 save(bd, geometria.osm, coordenadas.x.centroides, coordenadas.y.centroides, file = paste0(stores,'Datos_limpios.RData'))
