@@ -27,16 +27,15 @@ p_load(tidyverse, # Manipular dataframes
        purr) # Muestreo espacial para modelos de aprendizaje automático
 
 # cargar base de datos 
-
-bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
+bd <-load(paste0(getwd(),'/stores/Datos_limpios.RData'))
 
 # crear subset de entrenamiento
 train <-  bd %>%
-  subset(type_data == 1)
+  subset(type_data == "train")
 
 # crear subset de testeo
 test <- bd %>%
-  subset(type_data == 2)
+  subset(type_data == "test")
 
 ### modelo de arboles de regresión con tidymodelss ###
 
@@ -65,6 +64,23 @@ receta <- recipe(price ~ bathrooms+rooms+
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) 
+
+#-----Nueva receta que incluye surface y las variables de OSM
+
+## Obtener los nombres de las variables que contienen "distancia"
+indices <- grep("distancia", names(bd))%>%unlist
+variables_distancia <-select(bd,indices)
+variables_distancia <- bd%>% select(all_of(indices))
+class(variables_distancia)
+
+
+
+receta <-recipe(price ~ bathrooms+rooms+
+                      +parqueadero+terraza+ascensor+
+                      deposito+vigilancia+cocina_integral+ surface2+variables_distancia, data = bd) %>%
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors())
 
 # crear flujo de trabajo
 
