@@ -162,14 +162,14 @@ bd <- bd %>%
                           gsub(".*\\s(\\d+)\\sm.*", "\\1", description), surface))
 
 bd <- bd %>%
-  mutate(surface = ifelse(nchar(surface)>5, NA, surface))
-
-bd$surface<-as.numeric(bd$surface)
+  mutate(surface = ifelse(nchar(surface)>5, "NA", surface)) %>%
+  mutate(surface=as.numeric(surface))
 
 bd <- bd %>%
   group_by(bedrooms) %>%
-  mutate(surface = ifelse(is.na(surface), mean(surface),surface))%>%
+  mutate(surface2 = ifelse(is.na(surface), mean(surface, na.rm=TRUE),surface))%>%
   ungroup()
+
 # Transformacion de variables ---------------------------------------------
 
 # Transformar variables numericas binarias a categoricas 

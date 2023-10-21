@@ -38,7 +38,7 @@ train <-  bd %>%
 test <- bd %>%
   subset(type_data == 2)
 
-### modelo de arboles de regresión ###
+### modelo de arboles de regresión con tidymodelss ###
 
 # especificación del modelo 
 tree_model <- decision_tree(tree_depth = tune(),
@@ -97,7 +97,7 @@ walk(block_folds$splits, function(x) print(autoplot(x)))
 
 df_fold <- vfold_cv(train, v = 5)
 
-# estimar el modelo - long time ....
+# estimar el modelo - long time con de entrenamiento ....
 
 tune_tree <- tune_grid(
   workflow, # specifica un modelo de árbol de decisión
