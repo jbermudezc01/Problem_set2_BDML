@@ -55,29 +55,19 @@ tree_grid <- grid_random(
 head(tree_grid, n=20)
 dim(tree_grid)
 
-# especificar receta 
-
-receta <- recipe(price ~ bathrooms+rooms+
-                   +parqueadero+terraza+ascensor+
-                   deposito+vigilancia+cocina_integral+distancia_parques+
-                   distancia_restaurante, data = bd) %>%
-  step_novel(all_nominal_predictors()) %>% 
-  step_dummy(all_nominal_predictors()) %>% 
-  step_zv(all_predictors()) 
-
 #-----Nueva receta que incluye surface y las variables de OSM
 
 ## Obtener los nombres de las variables que contienen "distancia"
-indices <- grep("distancia", names(bd))%>%unlist
-variables_distancia <-select(bd,indices)
-variables_distancia <- bd%>% select(all_of(indices))
-class(variables_distancia)
+
+variables.distancia <- grep('distancia_',colnames(bd))
+outcome <- 'price'
+exo     <- c('bathrooms','bedrooms','parqueadero','terraza','ascensor','deposito','vigilancia','cocina_integral', 'surface2', 'piso_numerico')  
+columnas.distancia <- colnames(bd)[variables.distancia]
+formula <- as.formula(paste(outcome, paste(c(exo, columnas.distancia),collapse = '+'),sep='~'))
 
 
 
-receta <-recipe(price ~ bathrooms+rooms+
-                      +parqueadero+terraza+ascensor+
-                      deposito+vigilancia+cocina_integral+ surface2+variables_distancia, data = bd) %>%
+receta <-recipe(formula, data = bd) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors())
@@ -146,5 +136,4 @@ test <- test %>%
 test %>% 
   select(property_id, price) %>% 
   write.csv(file = "04_decision_tree.csv", row.names = F)
-
 
