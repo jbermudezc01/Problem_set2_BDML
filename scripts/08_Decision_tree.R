@@ -135,5 +135,5 @@ test <- test %>%
 # Exportar a CSV
 test %>% 
   select(property_id, price) %>% 
-  write.csv(file = "04_decision_tree.csv", row.names = F)
+  write.csv(file = "08_decision_tree.csv", row.names = F)
 

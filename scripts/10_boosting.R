@@ -27,16 +27,14 @@ p_load(tidyverse, # Manipular dataframes
        purr) # Muestreo espacial para modelos de aprendizaje automático
 
 # cargar base de datos 
-
-bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
-
+bd <-load(paste0(getwd(),'/stores/Datos_limpios.RData'))
 # crear subset de entrenamiento
 train <-  bd %>%
-  subset(type_data == 1)
+  subset(type_data == "train")
 
 # crear subset de testeo
 test <- bd %>%
-  subset(type_data == 2)
+  subset(type_data == "test")
 
 head(bd)
 
@@ -62,12 +60,29 @@ boost_grid <- grid_random(
 
 # especificar la receta
 
-receta <- recipe(price ~ piso_numerico+bathrooms+bedrooms+rooms+property_type+parqueadero+
-                   terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+
-                   distancia_restaurante+distancia_parques+distancia_estaciones_tp+distancia_mall, data = bd) %>%
+#receta <- recipe(price ~ piso_numerico+bathrooms+bedrooms+rooms+property_type+parqueadero+
+ #                  terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+
+  #                 distancia_restaurante+distancia_parques+distancia_estaciones_tp+distancia_mall, data = bd) %>%
+  #step_novel(all_nominal_predictors()) %>% 
+  #step_dummy(all_nominal_predictors()) %>% 
+  #step_zv(all_predictors()) 
+
+
+#Nueva receta
+
+variables.distancia <- grep('distancia_',colnames(bd))
+outcome <- 'price'
+exo     <- c('bathrooms','bedrooms','parqueadero','terraza','ascensor','deposito','vigilancia','cocina_integral', 'surface2', 'piso_numerico')  
+columnas.distancia <- colnames(bd)[variables.distancia]
+formula <- as.formula(paste(outcome, paste(c(exo, columnas.distancia),collapse = '+'),sep='~'))
+
+
+
+receta <-recipe(formula, data = bd) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
-  step_zv(all_predictors()) 
+  step_zv(all_predictors())
+
 
 # especificar el flujo de trabajo
 
@@ -133,4 +148,4 @@ test <- test %>%
 # Exportar a CSV
 test %>% 
   select(property_id, price) %>% 
-  write.csv(file = "02_boost.csv", row.names = F)
+  write.csv(file = "10_boost_newrecipe.csv", row.names = F)
