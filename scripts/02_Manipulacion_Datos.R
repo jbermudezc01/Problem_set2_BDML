@@ -75,26 +75,26 @@ moda <- function(x) {
 
 if(0){
   #Cuartos/rooms/bedrooms: Extraigamos el número de habitaciones de la descripción 
-  # bd <- bd %>%
-  #   mutate(bedrooms = ifelse(!is.na(rooms),bedrooms, 
-  #                           gsub(".*\\s(\\d+)cuartos.*", "\\1", description))) %>%
-  #   mutate(bedrooms = ifelse(nchar(bedrooms)>5,
-  #                           gsub(".*\\s(\\d+)\\salcobas.*", "\\1", description), bedrooms)) %>%
-  #   mutate(bedrooms = ifelse(nchar(bedrooms)>5,
-  #                           gsub(".*\\s(\\d+)\\shabitaciones.*", "\\1", description), bedrooms)) %>%
-  #   mutate(bedrooms = ifelse(nchar(bedrooms)>5,
-  #                            gsub(".*\\s(\\d+)\\shab.*", "\\1", description), bedrooms)) %>%
-  #   mutate(bedrooms = ifelse(nchar(bedrooms)>5,
-  #                           gsub(".*\\s\\scuartos*", "\\1", description), bedrooms))%>%
-  #   mutate(bedrooms = ifelse(nchar(bedrooms)>5,
-  #                           gsub(".*\\s\\salcobas.*", "\\1", description), bedrooms)) %>%
-  #   mutate(bedrooms = ifelse(nchar(bedrooms)>5,
-  #                           gsub(".*\\s\\habitaciones.*", "\\1", description), bedrooms))
-  
-  # bd <- bd %>%
-  #   mutate(bedrooms = ifelse(nchar(bedrooms)>5|nchar(bedrooms)==0,"NA", bedrooms))%>%
-  #   mutate(bedrooms = as.numeric(bedrooms))%>%
-  #   mutate(bedrooms = ifelse(!is.na(bedrooms), bedrooms, moda(bedrooms)))
+   bd <- bd %>%
+     mutate(bedrooms = ifelse(!is.na(rooms),bedrooms,
+                             gsub(".*\\s(\\d+)cuartos.*", "\\1", description))) %>%
+     mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                             gsub(".*\\s(\\d+)\\salcobas.*", "\\1", description), bedrooms)) %>%
+     mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                             gsub(".*\\s(\\d+)\\shabitaciones.*", "\\1", description), bedrooms)) %>%
+     mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                              gsub(".*\\s(\\d+)\\shab.*", "\\1", description), bedrooms)) %>%
+     mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                             gsub(".*\\s\\scuartos*", "\\1", description), bedrooms))%>%
+     mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                             gsub(".*\\s\\salcobas.*", "\\1", description), bedrooms)) %>%
+     mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                             gsub(".*\\s\\habitaciones.*", "\\1", description), bedrooms))
+
+   bd <- bd %>%
+     mutate(bedrooms = ifelse(nchar(bedrooms)>5|nchar(bedrooms)==0,"NA", bedrooms))%>%
+     mutate(bedrooms = as.numeric(bedrooms))%>%
+     mutate(bedrooms = ifelse(!is.na(bedrooms), bedrooms, moda(bedrooms)))
 }
 
 # Además al observar la variable de baños encontramos un comportamiento similar, supongamos que la moda de banos para los apartamentos que tienen 4 alcobas sea 3, entonces esa moda sera imputada por aquellos aptos de 4 alcobas
@@ -473,6 +473,16 @@ bd <- bd%>%
 # Quitar codigo_manzana, codigo_localidad, descrptio, 
 bd <- bd%>%
   select(-c('codigo_manzana','codigo_localidad','descriptio'))
+
+
+# Ultimos detalles antes de estimacion ------------------------------------
+# La variable dependiente sera log(price)
+bd <- bd %>% 
+  mutate(log_price = log(price))
+
+# Variable UPZ es factor
+bd <- bd %>% 
+  mutate(UPZ = as.factor(UPZ))
 
 # Exportar a csv y .RData -------------------------------------------------
 write_csv(bd, file = paste0(stores,'base_datos_tratada.csv'))
