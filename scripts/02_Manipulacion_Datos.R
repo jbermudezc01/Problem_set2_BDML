@@ -65,19 +65,47 @@ apply(bd, 2, function(x) round(sum(is.na(x)/length(x))*100,2))
 # completar los NA.
 
 # Para tratar los valores faltantes de <bathrooms> y <rooms> es importante ver que <bedrooms> si esta completa. Por lo que una buena idea seria imputar la moda
-# dependiendo del numero de alcobas que tenga el apto/casa.
-# Por ejemplo, supongamos que la moda de banos para los apartamentos que tienen 4 alcobas sea 3, entonces esa moda sera imputada por aquellos aptos de 4 alcobas
-# que tengan valor faltante.
-# Lo anterior se va a realizar para todos los valores de numeros de alcobas, y para las dos variables que faltan, es decir <bathrooms> y <rooms>
+# dependiendo del numero de alcobas que tenga el apto/casa. Sin embargo, se encuentra que cuando bedrooms es 0 rooms es NA, por lo que se busca una estrategía para extraer el número de 
+# alcobas o cuartos
+
+#Cuartos/rooms/bedrooms: Extraigamos el número de habitaciones de la descripción 
+bd <- bd %>%
+  mutate(bedrooms = ifelse(!is.na(rooms),bedrooms, 
+                          gsub(".*\\s(\\d+)cuartos.*", "\\1", description))) %>%
+  mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                          gsub(".*\\s(\\d+)\\salcobas.*", "\\1", description), bedrooms)) %>%
+  mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                          gsub(".*\\s(\\d+)\\shabitaciones.*", "\\1", description), bedrooms)) %>%
+  mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                           gsub(".*\\s(\\d+)\\shab.*", "\\1", description), bedrooms)) %>%
+  mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                          gsub(".*\\s\\scuartos*", "\\1", description), bedrooms))%>%
+  mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                          gsub(".*\\s\\salcobas.*", "\\1", description), bedrooms)) %>%
+  mutate(bedrooms = ifelse(nchar(bedrooms)>5,
+                          gsub(".*\\s\\habitaciones.*", "\\1", description), bedrooms))
+
+
+#Ya que no se pudo extraer el número de alcobas de todas las descripciones imputaremos por la moda, 
 moda <- function(x) {
   return(as.numeric(names(which.max(table(x)))))
 }
 
+bd <- bd %>%
+  mutate(bedrooms = ifelse(nchar(bedrooms)>5|nchar(bedrooms)==0,"NA", bedrooms))%>%
+  mutate(bedrooms = as.numeric(bedrooms))%>%
+  mutate(bedrooms = ifelse(!is.na(bedrooms), bedrooms, moda(bedrooms)))
+
+
+# Además al observar la variable de baños encontramos un comportamiento similar, supongamos que la moda de banos para los apartamentos que tienen 4 alcobas sea 3, entonces esa moda sera imputada por aquellos aptos de 4 alcobas
+# que tengan valor faltante.
+# Lo anterior se va a realizar para todos los valores de numeros de alcobas, y para las dos variables que faltan, es decir <bathrooms> y <rooms>
+
+
 # Imputar variables con la moda 
 bd <- bd %>%
   group_by(bedrooms) %>%
-  mutate(bathrooms = ifelse(is.na(bathrooms), moda(bathrooms), bathrooms)) %>%
-  mutate(rooms = ifelse(is.na(rooms), moda(rooms),rooms)) %>% 
+  mutate(bathrooms = ifelse(is.na(bathrooms), moda(bathrooms), bathrooms))%>% 
   ungroup()
 
 # Sin embargo, la variable <rooms> sigue con valores NA,por lo que vamos a imputar por la moda en general
