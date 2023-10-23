@@ -51,8 +51,8 @@ tree_model <- decision_tree(tree_depth = tune(),
 
 # Grilla de parametros
 tree_grid <- grid_random(
-  tree_depth(range = c(1, 20), trans= NULL),# modificar para cada modelo 
-  min_n(range = c(20,3000 ), trans = NULL),# modificar para cada modelo 
+  tree_depth(range = c(1, 30), trans= NULL),# modificar para cada modelo 
+  min_n(range = c(3,15 ), trans = NULL),# modificar para cada modelo 
   size = 100
 )
 head(tree_grid, n=20)
@@ -62,18 +62,29 @@ dim(tree_grid)
 
 ## Obtener los nombres de las variables que contienen "distancia"
 
-variables.distancia <- grep('distancia_',colnames(bd))
+variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
 outcome <- 'price'
-exo     <- c('bathrooms','bedrooms','parqueadero','terraza','ascensor','deposito','vigilancia','cocina_integral', 'surface2', 'piso_numerico')  
-columnas.distancia <- colnames(bd)[variables.distancia]
-formula <- as.formula(paste(outcome, paste(c(exo, columnas.distancia),collapse = '+'),sep='~'))
+exo     <- c('rooms','bathrooms','property_type','piso_numerico','parqueadero','terraza',
+             'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
+             'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
+             'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
+             'valor_catastral_vivienda') 
+formula <- as.formula(paste('price', paste(c(exo, variables.distancia),collapse = '+'),sep='~'))
 
 
+bd.seleccion <- bd %>% 
+  select(-c(setdiff(colnames(bd),c(exo, variables.distancia)))) %>% 
+  mutate(log_price = bd$log_price)
+bd.seleccion <- as_tibble(bd.seleccion)
+bd.seleccion <- bd.seleccion %>% 
+  select(-c('geometry'))
 
-receta <-recipe(formula, data = bd) %>%
+receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
+  step_poly(all_of(variables.distancia), degree = 3) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
-  step_zv(all_predictors())
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
 
 # crear flujo de trabajo
 
@@ -102,9 +113,6 @@ autoplot(block_folds) # visualización de los plieges
 
 walk(block_folds$splits, function(x) print(autoplot(x)))
 
-# Crear pliegues para la validación cruzada
-
-df_fold <- vfold_cv(train, v = 5)
 
 # estimar el modelo - long time con de entrenamiento ....
 
@@ -117,12 +125,12 @@ tune_tree <- tune_grid(
 
 # visualizacion los resultados de la busqueda de hiperparametros 
 autoplot(tune_tree)
+collect_metrics(tune_tree)
 
 # seleccionar las mejores estimaciones de parametros
 
 best_parms_tree <- select_best(tune_tree, metric = "mae")
 best_parms_tree
-
 # actulizar parametros con finalize_workflow() 
 
 tree_final <- finalize_workflow(workflow, best_parms_tree)
@@ -130,13 +138,21 @@ tree_final <- finalize_workflow(workflow, best_parms_tree)
 #ajustar el modelo con los datos de test
 tree_final_fit <- fit(tree_final, data = train)
 
+#MAE de la nueva predicción
+augment(tree_final_fit, new_data = bd) %>%
+  mae(truth = log_price, estimate = .pred)
 # predecimos el precio para los datos de test 
 
 test <- test %>%
-  mutate(price = predict(tree_final_fit, new_data = test)$.pred)
+  mutate(log_price = predict(tree_final_fit, new_data = test)$.pred)
 
-# Exportar a CSV
-test %>% 
+
+template.kagle <- test %>% 
+  select(property_id, log_price) %>% 
+  mutate(price = exp(log_price)) %>% 
   select(property_id, price) %>% 
-  write.csv(file = "08_decision_tree.csv", row.names = F)
+  st_drop_geometry()
 
+# Exportar a CSV en la carpeta de templates
+write.csv(template.kagle, file= paste0(templates,'Decision_tree_depth',round(best_parms_tree$tree_depth,4),'min_n',round(best_parms_tree$min_n),'.csv'),
+          row.names = F)

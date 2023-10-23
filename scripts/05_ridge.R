@@ -78,6 +78,15 @@ receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
   step_zv(all_predictors()) %>% 
   step_normalize(all_predictors())
 
+#Nueva receta
+
+receta<-recipe(formula.ridge, data = bd.seleccion) %>%
+  step_poly(all_of(variables.distancia), degree = 5) %>%
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
 # Workflow ----------------------------------------------------------------
 ridge_workflow <- workflow() %>%
   add_recipe(receta) %>%
