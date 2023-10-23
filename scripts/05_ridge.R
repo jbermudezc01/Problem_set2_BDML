@@ -31,6 +31,7 @@ p_load(tidyverse, # Manipular dataframes
 stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
 views     <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
 templates <- paste0(getwd(),'/templates/') # Directorio para crear templates
+
 # Cargar base de datos ----------------------------------------------------
 load(paste0(stores,'Datos_limpios.RData'))
 
@@ -48,7 +49,7 @@ ridge_spec <- linear_reg(penalty = tune(), mixture = 0) %>%
   set_engine("glmnet") 
 
 # Definir la grilla para los parametros 
-penalty_grid <- grid_regular(penalty(range = c(-4, 2)), levels = 50)
+penalty_grid <- grid_regular(penalty(), levels = 300)
 
 # Receta  -----------------------------------------------------------------
 # Para tener la receta primero necesitamos una formula adecuada
@@ -70,16 +71,11 @@ bd.seleccion <- bd.seleccion %>%
 
 # Ya podemos añadir las variables necesarias para la estimacion
 receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
+  step_poly(all_of(variables.distancia), degree = 3) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
   step_normalize(all_predictors())
-
-# receta <- recipe(formula = formula.ridge, data = bd) %>%
-#   step_novel(all_nominal_predictors()) %>% 
-#   step_dummy(all_nominal_predictors()) %>% 
-#   step_zv(all_predictors()) %>% 
-#   step_normalize(all_predictors())
 
 # Workflow ----------------------------------------------------------------
 ridge_workflow <- workflow() %>%

@@ -1,166 +1,168 @@
 ##########################################################
-# Prediccion precios de vivienda
+# Modelo elastic
 # Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
 ##########################################################
 
+# Limpiar environment -----------------------------------------------------
+rm(list = ls())
+cat('\014')
 
-# Cargar pacman (contiene la función p_load)
-library(pacman) 
-
-# Cargar las librerías listadas e instalarlas en caso de ser necesario
+# Librerias ---------------------------------------------------------------
+require(pacman)
 p_load(tidyverse, # Manipular dataframes
-       rio, # Import data easily
+       rio, # Importar datos fácilmente
        plotly, # Gráficos interactivos
        leaflet, # Mapas interactivos
-       rgeos, # Calcular centroides de un poligono
-       tmaptools, # geocode_OSM()
+       # rgeos, # ya no se encuentra en el CRAN, por buenas practicas no se utilizara
+       units, # unidades
        sf, # Leer/escribir/manipular datos espaciales
-       osmdata, # Get OSM's data 
-       tidymodels) #para modelos de ML
+       osmdata, # Obtener datos de OpenStreetMap (OSM)
+       tidymodels, # Modelado de datos limpios y ordenados
+       randomForest, # Modelos de bosque aleatorio
+       rattle, # Interfaz gráfica para el modelado de datos
+       spatialsample, # Muestreo espacial para modelos de aprendizaje automático
+       xgboost,
+       tmaptools,
+       terra,
+       purrr,
+       glmnet) 
 
-# cargar base de datos 
+# Directorios -------------------------------------------------------------
+stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
+views     <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
+templates <- paste0(getwd(),'/templates/') # Directorio para crear templates
 
-bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
+# Cargar base de datos ----------------------------------------------------
+load(paste0(stores,'Datos_limpios.RData'))
 
 # crear subset de entrenamiento
 train <-  bd %>%
-  subset(type_data == 1)
+  subset(type_data == 'train')
 
-# definimos el data set train como  sf
-train_sf <- st_as_sf( 
-  train,
-  coords = c("lon", "lat"), 
-  crs = 4326
-)
-
-# crear subset de prueba
+# crear subset de testeo
 test <- bd %>%
-  subset(type_data == 2)
+  subset(type_data == 'test')
 
-# Especificación del modelo
-# Mixture puede tomar valores entre 0 y 1, sin embargo tenemos que hacer CV para saber cuál usar,
-#Provemos con 0.5
-elastic_net_spec <- linear_reg(penalty = lambda, mixture = .5) %>%
-  set_engine("glmnet")
+# Receta  -----------------------------------------------------------------
+# Para tener la receta primero necesitamos una formula adecuada
+variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','parqueadero','terraza',
+                          'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
+                          'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
+                          'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
+                          'valor_catastral_vivienda') 
+variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
+formula.elastic       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia),collapse ='+'),
+                                        sep='~'))
 
+bd.seleccion <- bd %>% 
+  select(-c(setdiff(colnames(bd),c(variables.exogenas, variables.distancia)))) %>% 
+  mutate(log_price = bd$log_price)
+bd.seleccion <- as_tibble(bd.seleccion)
+bd.seleccion <- bd.seleccion %>% 
+  select(-c('geometry'))
 
-# Receta 1
-receta <- recipe(formula = price ~ bathrooms+
-                   bedrooms+rooms+property_type+parqueadero+
-                   terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+distancia_restaurante+
-                   distancia_parques+ distancia_estaciones_tp+ distancia_mall+distancia_ciclovias, data = bd) %>% 
+# Ya podemos añadir las variables necesarias para la estimacion
+receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
+  step_poly(all_of(variables.distancia), degree = 3) %>% 
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
   step_normalize(all_predictors())
 
-# Crear un flujo de trabajo 
-EN_workflow <- workflow() %>%
-  add_recipe(receta) %>%
-  add_model(elastic_net_spec)
-
-#____________________________________________________-
-# realizar busqueda de hiperparametros utilizando validación cruzada 
-# realizar una validación cruzada de bloques espaciales
-
-set.seed(123)
-block_folds <- spatial_block_cv(train_sf, v = 5) 
-
-# visualización de plieges 
-autoplot(block_folds) # visualización de los plieges 
-
-#NPI excluimos una zona (a), entrenamos las demás ( b,c,d,e) y validamos con (a) 
-
-#NPI walk(block_folds$splits, function(x) print(autoplot(x)))
-
-# Crear pliegues para la validación cruzada
-
-df_fold <- vfold_cv(train, v = 5)
-
-
-
-#_______________________________________
-# busqueda de hiperparametros 
-
-tune_EN <- tune_grid(
-  EN_workflow,
-  resamples = df_fold, 
-  grid = penalty_grid,
-  metrics = "MAE"
-)
-
-# seleccionar las mejores estimaciones de parametros
-
-best_parms_EN <- select_best(tune_EN, metric = "MAE")
-best_parms_EN
-
-# actulizar parametros con finalize_workflow() 
-
-EN_final <- finalize_workflow(EN_workflow, best_parms_EN)
-
-#ajustar el modelo con los datos de test
-
-EN_final_fit <- fit(EN_final, data = train)
-
-# predecimos el precio para los datos de test 
-
-test <- test %>%
-  mutate(price = predict(EN_final_fit, new_data = test)$.pred)
-
-# Exportar a CSV
-test %>% 
-  select(property_id, price) %>% 
-  write.csv(file = "07_EN.csv", row.names = F)
-
-
-
-
-
-
-
-
-
-
-#######################################
-#Método de estimación sin recipe y workflow
-
-#Leave one out Cross Validation (LOOCV) espacial con los datos de entrenamiento:
-location_folds_train<-spatial_leave_location_out_cv(
+# Busqueda hiperparametros CV espacial ------------------------------------
+train_sf <- st_as_sf( 
   train,
-  group = Neighborhood
+  coords = c("lon", "lat"), 
+  crs = crs(bd)
 )
-autoplot(location_folds_train)
 
-folds_train<-list()
-for(i in 1:length(location_folds_train$splits)){
-  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
+# Realizar una validación cruzada de bloques espaciales
+set.seed(123)
+block_folds <- spatial_block_cv(train_sf, v = 10) 
+
+# En adelante se usara un ciclo for para poder iterar con respecto a mixture y tune, ya que mixture
+# indica la combinacion entre lasso y ridge
+# Se generara una grilla de mixture para obtener los valoresa traves de los cuales iterar
+mixture.grid   <- grid_regular(mixture(), levels = 50)
+mixture.vector <- mixture.grid$mixture
+
+# Antes de la iteracion se creara una matriz para guardar las mejores combinaciones de alpha, lambda
+# y MAE, es decir una matriz con tantas filas como valores en mixture.vector y con 3 columnas
+mae.matrix <- matrix(NA, nrow = length(mixture.vector), ncol=3)
+colnames(mae.matrix) <- c('mixture','penalty','MAE')
+rownames(mae.matrix) <- seq_along(mixture.vector)
+
+for(i in seq_along(mixture.vector)){
+  mixture.i <- mixture.vector[i]
+  # Especificacion del modelo -----------------------------------------------
+  elastic_spec <- linear_reg(penalty = tune(), mixture = mixture.i) %>%
+    set_mode("regression") %>%
+    set_engine("glmnet") 
+  
+  # Definir la grilla para los parametros 
+  penalty_grid <- grid_regular(penalty(), levels = 200)
+  
+  # Workflow ----------------------------------------------------------------
+  elastic_workflow <- workflow() %>%
+    add_recipe(receta) %>%
+    add_model(elastic_spec)
+
+  # Los bloques espaciales se encuentran en <block_folds>
+  # Buscamos los hiperparametros basado en el MAE y usando los bloques espaciales
+  tune.elastic <- tune_grid(
+    elastic_workflow,         # El flujo de trabajo que contiene: receta y especificación del modelo
+    resamples = block_folds,  # Folds de validación cruzada
+    grid = penalty_grid,        # Grilla de valores de penalización
+    metrics = metric_set(mae) # Utilizamos la metrica MAE
+  )
+  
+  # Utilizamos 'collect_metrics' para extraer las métricas de rendimiento de la 
+  # busqueda de hiperparámetros
+  collect_metrics(tune.elastic)
+  
+  # Utilizar 'select_best' para seleccionar el mejor valor de penalización
+  best_penalty <- select_best(tune.elastic, metric = "mae")
+  
+  # Guardar los datos en la matriz <mae.matrix>
+  mae.matrix[i,] <- c(mixture.i, best_penalty$penalty, min(collect_metrics(tune.elastic)$mean))
 }
 
-p_load("caret")
-fitControl<-trainControl(method ="cv",
-                         index=folds)
+# volverlo dataframe
+dataframe.mae <- as.data.frame(mae.matrix)
 
+# Vemos que el mejor mixture es 0.48979592 combinado con una penalidad de 0.007752597
+best_parameters <- dataframe.mae[which.min(dataframe.mae$MAE), c('penalty','mixture')]
+best_mae        <- dataframe.mae[which.min(dataframe.mae$MAE), 'MAE']
 
-#Entrenamos nuestro modelo con "glmnet" controlando por la métrica del Mean Absolute
-#Error, mientras miramos una grilla de los hiperparámetros alpha y lambda
-EN<-train(log(Sale_Price) ~ Gr_Liv_Area  +  Bldg_Type ,
-          data=ames_sf,
-          method = 'glmnet',
-          trControl = fitControl,
-          metric="MAE",
-          tuneGrid = expand.grid(alpha =seq(0,1,length.out = 20),
-                                 lambda = seq(0.001,0.2,length.out = 50))
-)
+# Finalizar el modelo -----------------------------------------------------
+# Actualizar primero la especificacion y el workflow
+elastic_spec <- linear_reg(penalty = best_parameters$penalty, mixture = best_parameters$mixture) %>%
+  set_mode("regression") %>%
+  set_engine("glmnet") 
+elastic_workflow <- workflow() %>%
+  add_recipe(receta) %>%
+  add_model(elastic_spec)
 
-EN$bestTune
-round(EN$results$RMSE[which.min(EN$results$lambda)],4)
+# Ajustar el modelo con los datos de test
+elastic_final_fit <- fit(elastic_workflow, data = train)
 
-test$log_price_hat<-predict(EN_tp,newdata = test)
-test<- test  %>% mutate(price_hat=exp(log_price_hat))
-head(test  %>% select(Sale_Price,log_price_hat,price_hat)  %>% st_drop_geometry())
+# Este modelo final se puede aplicar al conjunto de datos de prueba para validar el rendimiento
+# Evaluar el modelo de regresión elastic en datos de prueba. Utilizar 'augment' para generar predicciones en datos de prueba y 
+# combinar con las respuestas reales
+augment(elastic_final_fit, new_data = bd) %>%
+  mae(truth = log_price, estimate = .pred)
 
+# Predecir el log(precio) para la base test
+test <- test %>%
+  mutate(log_price = predict(elastic_final_fit, new_data = test)$.pred)
 
+template.kagle <- test %>% 
+  select(property_id, log_price) %>% 
+  mutate(price = exp(log_price)) %>% 
+  select(property_id, price) %>% 
+  st_drop_geometry()
 
-#Métricas de desempeño de prueba (MAE=observada-estimada) 
-mean(abs(test$Sale_Price-test$price_hat))
-mean(abs(test$Sale_Price-round(test$price_hat)))
+# Exportar a CSV en la carpeta de templates
+write.csv(template.kagle, 
+          file= paste0(templates,'elastic_penalty',round(best_parameters$penalty,4),'_mixture',round(best_parameters$mixture,4),'.csv'),
+          row.names = F)
