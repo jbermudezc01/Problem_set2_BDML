@@ -49,7 +49,7 @@ ridge_spec <- linear_reg(penalty = tune(), mixture = 0) %>%
   set_engine("glmnet") 
 
 # Definir la grilla para los parametros 
-penalty_grid <- grid_regular(penalty(), levels = 300)
+penalty_grid <- grid_regular(penalty(), levels = 1000)
 
 # Receta  -----------------------------------------------------------------
 # Para tener la receta primero necesitamos una formula adecuada
@@ -72,6 +72,7 @@ bd.seleccion <- bd.seleccion %>%
 # Ya podemos añadir las variables necesarias para la estimacion
 receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
   step_poly(all_of(variables.distancia), degree = 3) %>%
+  #step_interact(terms = as.formula(paste(' ~ ',paste0(paste0(variables.distancia,':','property_type'),collapse =' + ')))) %>% 
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 

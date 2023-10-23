@@ -1,18 +1,19 @@
-### modelo de predicción: lasso  ##### 
+##########################################################
+# Modelo lasso
+# Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
+##########################################################
 
-#Limpieza area de trabajo 
-rm(list=ls())
+# Limpiar environment -----------------------------------------------------
+rm(list = ls())
 cat('\014')
 
-# cargar paquetes 
-install.packages("pacman")
-library(pacman)
-# cargar librerias 
+# Librerias ---------------------------------------------------------------
+require(pacman)
 p_load(tidyverse, # Manipular dataframes
        rio, # Importar datos fácilmente
        plotly, # Gráficos interactivos
        leaflet, # Mapas interactivos
-       rgeos, # Calcular centroides de un polígono
+       # rgeos, # ya no se encuentra en el CRAN, por buenas practicas no se utilizara
        units, # unidades
        sf, # Leer/escribir/manipular datos espaciales
        osmdata, # Obtener datos de OpenStreetMap (OSM)
@@ -21,110 +22,130 @@ p_load(tidyverse, # Manipular dataframes
        rattle, # Interfaz gráfica para el modelado de datos
        spatialsample, # Muestreo espacial para modelos de aprendizaje automático
        xgboost,
-       scals,
-       purr,
+       tmaptools,
+       terra,
+       purrr,
        glmnet) 
 
-# cargar base de datos 
+# Directorios -------------------------------------------------------------
+stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
+views     <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
+templates <- paste0(getwd(),'/templates/') # Directorio para crear templates
 
-bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
+# Cargar base de datos ----------------------------------------------------
+load(paste0(stores,'Datos_limpios.RData'))
 
 # crear subset de entrenamiento
 train <-  bd %>%
-  subset(type_data == 1)
+  subset(type_data == 'train')
 
 # crear subset de testeo
 test <- bd %>%
-  subset(type_data == 2)
+  subset(type_data == 'test')
 
-# modelo lasso 
-
-# especificación del modelo 
-
+# Especificacion del modelo -----------------------------------------------
 lasso_spec <- linear_reg(penalty = tune(), mixture = 1) %>%
   set_mode("regression") %>%
   set_engine("glmnet") 
 
-head(bd)
+# Definir la grilla para los parametros 
+penalty_grid <- grid_regular(penalty(range = c(-4, 2)), levels = 200)
 
-# definir intervalo de parametros
+# Receta  -----------------------------------------------------------------
+# Para tener la receta primero necesitamos una formula adecuada
+variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','parqueadero','terraza',
+                          'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
+                          'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
+                          'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
+                          'valor_catastral_vivienda') 
+variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
+formula.lasso       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia),collapse ='+'),
+                                        sep='~'))
 
-penalty_grid <- grid_regular(penalty(range = c(-2, 2)), levels = 30)
+bd.seleccion <- bd %>% 
+  select(-c(setdiff(colnames(bd),c(variables.exogenas, variables.distancia)))) %>% 
+  mutate(log_price = bd$log_price)
+bd.seleccion <- as_tibble(bd.seleccion)
+bd.seleccion <- bd.seleccion %>% 
+  select(-c('geometry'))
 
-# receta de preprocesamiento 
-
-receta <- recipe(formula = price ~ bathrooms+
-                   bedrooms+rooms+property_type+parqueadero+
-                   terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+distancia_restaurante+
-                   distancia_parques+ distancia_estaciones_tp+ distancia_mall+distancia_ciclovias, data = bd) %>% 
+# Ya podemos añadir las variables necesarias para la estimacion
+receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
   step_normalize(all_predictors())
 
-# crear flujo de trabajo 
+# receta <- recipe(formula = formula.lasso, data = bd) %>%
+#   step_novel(all_nominal_predictors()) %>% 
+#   step_dummy(all_nominal_predictors()) %>% 
+#   step_zv(all_predictors()) %>% 
+#   step_normalize(all_predictors())
 
+# Workflow ----------------------------------------------------------------
 lasso_workflow <- workflow() %>%
   add_recipe(receta) %>%
   add_model(lasso_spec)
 
-# realizar busqueda de hiperparametros utilizando validación cruzada 
-
-# definimos el data set train como  sf
+# Busqueda hiperparametros CV espacial ------------------------------------
 train_sf <- st_as_sf( 
   train,
   coords = c("lon", "lat"), 
-  crs = 4326
+  crs = crs(bd)
 )
 
-# realizar una validación cruzada de bloques espaciales
-
+# Realizar una validación cruzada de bloques espaciales
 set.seed(123)
-block_folds <- spatial_block_cv(train_sf, v = 5) 
+block_folds <- spatial_block_cv(train_sf, v = 10) 
 
-# visualización de plieges 
-autoplot(block_folds) # visualización de los plieges 
+# Visualización de pliegues 
+# autoplot(block_folds) # visualización de los pliegues 
 
-# excluimos una zona (a), entrenamos las demás ( b,c,d,e) y validamos con (a) 
+# Excluimos una zona (a), entrenamos las demás ( b,c,d,e) y validamos con (a) 
+# walk(block_folds$splits, function(x) print(autoplot(x)))
 
-walk(block_folds$splits, function(x) print(autoplot(x)))
-
-# Crear pliegues para la validación cruzada
-
-df_fold <- vfold_cv(train, v = 5)
-
-# busqueda de hiperparametros 
-
-tune_lasso <- tune_grid(
-  lasso_workflow,
-  resamples = df_fold, 
-  grid = penalty_grid,
-  metrics = metric_set(rmse)
+# Los bloques espaciales se encuentran en <block_folds>
+# Buscamos los hiperparametros basado en el MAE y usando los bloques espaciales
+tune.lasso <- tune_grid(
+  lasso_workflow,         # El flujo de trabajo que contiene: receta y especificación del modelo
+  resamples = block_folds,  # Folds de validación cruzada
+  grid = penalty_grid,        # Grilla de valores de penalización
+  metrics = metric_set(mae) # Utilizamos la metrica MAE
 )
- # grafica de parametros 
 
-autoplot(tune_lasso)
+# Podemos graficar los hiperparametros
+autoplot(tune.lasso)
 
-# seleccionar las mejores estimaciones de parametros
+# Utilizamos 'collect_metrics' para extraer las métricas de rendimiento de la 
+# busqueda de hiperparámetros
+collect_metrics(tune.lasso)
 
-best_parms_lasso <- select_best(tune_lasso, metric = "rmse")
-best_parms_lasso
+# Utilizar 'select_best' para seleccionar el mejor valor de penalización
+best_penalty <- select_best(tune.lasso, metric = "mae")
 
-# actulizar parametros con finalize_workflow() 
+# Finalizar el modelo -----------------------------------------------------
+# Actulizar parametros con finalize_workflow() 
+lasso_final <- finalize_workflow(lasso_workflow, best_penalty)
 
-lasso_final <- finalize_workflow(lasso_workflow, best_parms_lasso)
-
-#ajustar el modelo con los datos de test
-
+# Ajustar el modelo con los datos de test
 lasso_final_fit <- fit(lasso_final, data = train)
 
-# predecimos el precio para los datos de test 
+# Este modelo final se puede aplicar al conjunto de datos de prueba para validar el rendimiento
+# Evaluar el modelo de regresión lasso en datos de prueba. Utilizar 'augment' para generar predicciones en datos de prueba y 
+# combinar con las respuestas reales
+augment(lasso_final_fit, new_data = bd) %>%
+  mae(truth = log_price, estimate = .pred)
 
+# Predecir el log(precio) para la base test
 test <- test %>%
-  mutate(price = predict(lasso_final_fit, new_data = test)$.pred)
+  mutate(log_price = predict(lasso_final_fit, new_data = test)$.pred)
 
-# Exportar a CSV
-test %>% 
+template.kagle <- test %>% 
+  select(property_id, log_price) %>% 
+  mutate(price = exp(log_price)) %>% 
   select(property_id, price) %>% 
-  write.csv(file = "05_lasso.csv", row.names = F)
+  st_drop_geometry()
 
+# Exportar a CSV en la carpeta de templates
+write.csv(template.kagle, file= paste0(templates,'lasso_penalty',round(best_penalty$penalty,4),'.csv'),
+          row.names = F)
