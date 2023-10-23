@@ -46,15 +46,15 @@ test <- bd %>%
 # Especificacion del modelo -----------------------------------------------
 boost_spec <- boost_tree(
   trees = tune(),
-  min_n = tune(),
+  tree_depth = tune(),
   learn_rate = tune()
 ) %>%
   set_mode("regression")  
 
-# Tune grid aleatorio para el modelo de boost
+# Tune grid regular para el modelo de boost
 boost_grid <- grid_regular(
-  trees(range = c(100, 600)),
-  min_n(range = c(1, 20)),
+  trees(range = c(100, 200)),
+  tree_depth(range = c(1,1)), # Siempre nos daba el mejor tree_depth 1
   learn_rate(range = c(0.001, 0.01)),
   levels = 10
 )
@@ -79,7 +79,7 @@ bd.seleccion <- bd.seleccion %>%
 
 # Ya podemos añadir las variables necesarias para la estimacion
 receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
-  step_poly(all_of(variables.distancia), degree = 3) %>% 
+  # step_poly(all_of(variables.distancia), degree = 3) %>% 
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
@@ -112,7 +112,6 @@ tune_boost <- tune_grid(
 # visualizacion los resultados de la busqueda de hiperparametros 
 autoplot(tune_boost)
 
-
 # Mejores estimaciones de parametros --------------------------------------
 best_parms_boost <- select_best(tune_boost, metric = "mae")
 best_parms_boost
@@ -135,6 +134,7 @@ template.kagle <- test %>%
 
 # Exportar a CSV en la carpeta de templates
 write.csv(template.kagle, 
-          file= paste0(templates,'boosting_trees',round(best_parameters$penalty,4),'_mixture',round(best_parameters$mixture,4),'.csv'),
+          file= paste0(templates,'boosting_trees',round(best_parms_boost$trees,4),'_depth',round(best_parms_boost$tree_depth,4),
+                       '_learnrate',round(best_parms_boost$learn_rate,4),'.csv'),
           row.names = F)
 
