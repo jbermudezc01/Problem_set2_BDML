@@ -1,52 +1,55 @@
-### modelo de predicción: Arboles de decisión ##### 
+##########################################################
+# Modelo Arboles de Decision
+# Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
+##########################################################
 
-## limpieza y transformación de datos ##
-
-#Limpieza area de trabajo 
-rm(list=ls())
+# Limpiar environment -----------------------------------------------------
+rm(list = ls())
 cat('\014')
 
-# cargar paquetes 
-install.packages("pacman")
-library(pacman)
-# cargar librerias 
+# Librerias ---------------------------------------------------------------
+require(pacman)
 p_load(tidyverse, # Manipular dataframes
        rio, # Importar datos fácilmente
        plotly, # Gráficos interactivos
        leaflet, # Mapas interactivos
-       rgeos, # Calcular centroides de un polígono
+       # rgeos, # ya no se encuentra en el CRAN, por buenas practicas no se utilizara
        units, # unidades
        sf, # Leer/escribir/manipular datos espaciales
        osmdata, # Obtener datos de OpenStreetMap (OSM)
        tidymodels, # Modelado de datos limpios y ordenados
        randomForest, # Modelos de bosque aleatorio
        rattle, # Interfaz gráfica para el modelado de datos
-       spatialsample,
+       spatialsample, # Muestreo espacial para modelos de aprendizaje automático
        xgboost,
-       scals,
-       purr) # Muestreo espacial para modelos de aprendizaje automático
+       tmaptools,
+       terra,
+       purrr,
+       glmnet) 
 
-# cargar base de datos 
-bd <-load(paste0(getwd(),'/stores/Datos_limpios.RData'))
+# Directorios -------------------------------------------------------------
+stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
+views     <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
+templates <- paste0(getwd(),'/templates/') # Directorio para crear templates
+
+# Cargar base de datos ----------------------------------------------------
+load(paste0(stores,'Datos_limpios.RData'))
 
 # crear subset de entrenamiento
 train <-  bd %>%
-  subset(type_data == "train")
+  subset(type_data == 'train')
 
 # crear subset de testeo
 test <- bd %>%
-  subset(type_data == "test")
+  subset(type_data == 'test')
 
-### modelo de arboles de regresión con tidymodelss ###
-
-# especificación del modelo 
+# Especificacion modeo ----------------------------------------------------
 tree_model <- decision_tree(tree_depth = tune(),
-                                        min_n      = tune()) %>% 
+                            min_n = tune()) %>% 
   set_engine("rpart") %>% 
   set_mode("regression") 
 
-# crear grilla de parametros 
-
+# Grilla de parametros
 tree_grid <- grid_random(
   tree_depth(range = c(1, 20), trans= NULL),# modificar para cada modelo 
   min_n(range = c(20,3000 ), trans = NULL),# modificar para cada modelo 

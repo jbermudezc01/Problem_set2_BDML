@@ -1,47 +1,49 @@
-### modelo de predicción: Random forest ##### 
+##########################################################
+# Modelo boosting
+# Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
+##########################################################
 
-## limpieza y transformación de datos ##
-
-#Limpieza area de trabajo 
-rm(list=ls())
+# Limpiar environment -----------------------------------------------------
+rm(list = ls())
 cat('\014')
 
-# cargar paquetes 
-install.packages("pacman")
-library(pacman)
-# cargar librerias 
+# Librerias ---------------------------------------------------------------
+require(pacman)
 p_load(tidyverse, # Manipular dataframes
        rio, # Importar datos fácilmente
        plotly, # Gráficos interactivos
        leaflet, # Mapas interactivos
-       rgeos, # Calcular centroides de un polígono
+       # rgeos, # ya no se encuentra en el CRAN, por buenas practicas no se utilizara
        units, # unidades
        sf, # Leer/escribir/manipular datos espaciales
        osmdata, # Obtener datos de OpenStreetMap (OSM)
        tidymodels, # Modelado de datos limpios y ordenados
        randomForest, # Modelos de bosque aleatorio
        rattle, # Interfaz gráfica para el modelado de datos
-       spatialsample,
+       spatialsample, # Muestreo espacial para modelos de aprendizaje automático
        xgboost,
-       scals,
-       purr) # Muestreo espacial para modelos de aprendizaje automático
+       tmaptools,
+       terra,
+       purrr,
+       glmnet) 
 
-# cargar base de datos 
-bd <-load(paste0(getwd(),'/stores/Datos_limpios.RData'))
+# Directorios -------------------------------------------------------------
+stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
+views     <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
+templates <- paste0(getwd(),'/templates/') # Directorio para crear templates
+
+# Cargar base de datos ----------------------------------------------------
+load(paste0(stores,'Datos_limpios.RData'))
+
 # crear subset de entrenamiento
 train <-  bd %>%
-  subset(type_data == "train")
+  subset(type_data == 'train')
 
 # crear subset de testeo
 test <- bd %>%
-  subset(type_data == "test")
+  subset(type_data == 'test')
 
-head(bd)
-
-# modelo boosting
-
-# especificar el modelo 
-
+# Especificacion del modelo -----------------------------------------------
 boost_spec <- boost_tree(
   trees = tune(),
   min_n = tune(),
@@ -50,73 +52,56 @@ boost_spec <- boost_tree(
   set_mode("regression")  
 
 # Tune grid aleatorio para el modelo de boost
-
-boost_grid <- grid_random(
-  trees(range = c(100, 500)),
-  min_n(range = c(1, 10)),
-  learn_rate(range = c(0.001, 0.1)),
-  size = 5
+boost_grid <- grid_regular(
+  trees(range = c(100, 600)),
+  min_n(range = c(1, 20)),
+  learn_rate(range = c(0.001, 0.01)),
+  levels = 10
 )
 
-# especificar la receta
+# Receta  -----------------------------------------------------------------
+# Para tener la receta primero necesitamos una formula adecuada
+variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','parqueadero','terraza',
+                          'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
+                          'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
+                          'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
+                          'valor_catastral_vivienda') 
+variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
+formula.boosting       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia),collapse ='+'),
+                                          sep='~'))
 
-#receta <- recipe(price ~ piso_numerico+bathrooms+bedrooms+rooms+property_type+parqueadero+
- #                  terraza+ascensor+deposito+vigilancia+cocina_integral+piso_laminado+
-  #                 distancia_restaurante+distancia_parques+distancia_estaciones_tp+distancia_mall, data = bd) %>%
-  #step_novel(all_nominal_predictors()) %>% 
-  #step_dummy(all_nominal_predictors()) %>% 
-  #step_zv(all_predictors()) 
+bd.seleccion <- bd %>% 
+  select(-c(setdiff(colnames(bd),c(variables.exogenas, variables.distancia)))) %>% 
+  mutate(log_price = bd$log_price)
+bd.seleccion <- as_tibble(bd.seleccion)
+bd.seleccion <- bd.seleccion %>% 
+  select(-c('geometry'))
 
-
-#Nueva receta
-
-variables.distancia <- grep('distancia_',colnames(bd))
-outcome <- 'price'
-exo     <- c('bathrooms','bedrooms','parqueadero','terraza','ascensor','deposito','vigilancia','cocina_integral', 'surface2', 'piso_numerico')  
-columnas.distancia <- colnames(bd)[variables.distancia]
-formula <- as.formula(paste(outcome, paste(c(exo, columnas.distancia),collapse = '+'),sep='~'))
-
-
-
-receta <-recipe(formula, data = bd) %>%
+# Ya podemos añadir las variables necesarias para la estimacion
+receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
+  step_poly(all_of(variables.distancia), degree = 3) %>% 
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
-  step_zv(all_predictors())
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
 
-
-# especificar el flujo de trabajo
-
+# Workflow ----------------------------------------------------------------
 workflow <- workflow() %>%
   add_recipe(receta) %>%
   add_model(boost_spec)
 
-# validación cruzada espacial 
-
-# definimos el data set train como  sf
+# Busqueda hiperparametros CV espacial ------------------------------------
 train_sf <- st_as_sf( 
   train,
   coords = c("lon", "lat"), 
-  crs = 4326
+  crs = crs(bd)
 )
 
-# realizar una validación cruzada de bloques espaciales
-
+# Realizar una validación cruzada de bloques espaciales
 set.seed(123)
-block_folds <- spatial_block_cv(train_sf, v = 5) 
+block_folds <- spatial_block_cv(train_sf, v = 10) 
 
-# visualización de plieges 
-autoplot(block_folds) # visualización de los plieges 
-
-# excluimos una zona (a), entrenamos las demás ( b,c,d,e) y validamos con (a) 
-
-walk(block_folds$splits, function(x) print(autoplot(x)))
-
-# Crear pliegues para la validación cruzada
-
-df_fold <- vfold_cv(train, v = 5)
-
-# estimar el modelo - long time ....
-
+# estimar el modelo -
 tune_boost <- tune_grid(
   workflow, # specifica un modelo de randomn forest
   resamples = block_folds, # Usa los pliegues de validación cruzada definidos previamente en block_folds
@@ -127,25 +112,29 @@ tune_boost <- tune_grid(
 # visualizacion los resultados de la busqueda de hiperparametros 
 autoplot(tune_boost)
 
-# seleccionar las mejores estimaciones de parametros
 
+# Mejores estimaciones de parametros --------------------------------------
 best_parms_boost <- select_best(tune_boost, metric = "mae")
 best_parms_boost
 
-# actulizar parametros con finalize_workflow() 
-
+# Actualizar parametros con finalize_workflow() 
 boost_final <- finalize_workflow(workflow, best_parms_boost)
 
-#ajustar el modelo con los datos de test
-
+# Ajustar el modelo con los datos de entrenamiento
 boost_final_fit <- fit(boost_final, data = train)
 
 # predecimos el precio para los datos de test 
-
 test <- test %>%
   mutate(price = predict(boost_final_fit, new_data = test)$.pred)
 
-# Exportar a CSV
-test %>% 
+template.kagle <- test %>% 
+  select(property_id, log_price) %>% 
+  mutate(price = exp(log_price)) %>% 
   select(property_id, price) %>% 
-  write.csv(file = "10_boost_newrecipe.csv", row.names = F)
+  st_drop_geometry()
+
+# Exportar a CSV en la carpeta de templates
+write.csv(template.kagle, 
+          file= paste0(templates,'boosting_trees',round(best_parameters$penalty,4),'_mixture',round(best_parameters$mixture,4),'.csv'),
+          row.names = F)
+
