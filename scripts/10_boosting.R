@@ -67,7 +67,15 @@ variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','p
                           'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
                           'valor_catastral_vivienda') 
 variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
-formula.boosting       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia),collapse ='+'),
+
+bd<-bd%>%
+  mutate(inter_transmixsurface=distancia_tm*surface2)%>%
+  mutate(inter_transmixarearesidencial=distancia_tm*area_residencial_manzana)%>%
+  mutate(inter_transmixciclovia=distancia_cycleway*distancia_mall)
+
+variables.interaccion <- colnames(bd)[grep('inter_', colnames(bd))]
+
+formula.boosting       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia, variables.interaccion),collapse ='+'),
                                           sep='~'))
 
 bd.seleccion <- bd %>% 
@@ -79,7 +87,7 @@ bd.seleccion <- bd.seleccion %>%
 
 # Ya podemos añadir las variables necesarias para la estimacion
 receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
-  # step_poly(all_of(variables.distancia), degree = 3) %>% 
+  step_poly(all_of(variables.distancia), degree = 3) %>% 
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_zv(all_predictors()) %>% 
