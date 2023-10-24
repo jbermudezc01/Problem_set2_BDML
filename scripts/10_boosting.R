@@ -53,10 +53,10 @@ boost_spec <- boost_tree(
 
 # Tune grid regular para el modelo de boost
 boost_grid <- grid_regular(
-  trees(range = c(100, 200)),
+  trees(range = c(100, 130)),
   tree_depth(range = c(1,1)), # Siempre nos daba el mejor tree_depth 1
-  learn_rate(range = c(0.001, 0.01)),
-  levels = 10
+  learn_rate(range = c(0.001, 0.005)),
+  levels = 20
 )
 
 # Receta  -----------------------------------------------------------------
