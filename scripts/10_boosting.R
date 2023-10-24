@@ -124,13 +124,18 @@ boost_final_fit <- fit(boost_final, data = train)
 
 # predecimos el precio para los datos de test 
 test <- test %>%
-  mutate(price = predict(boost_final_fit, new_data = test)$.pred)
+  mutate(log_price = predict(boost_final_fit, new_data = test)$.pred)
+
+collect_metrics(tune_boost)
+augment(boost_final_fit, new_data = bd) %>%
+  mae(truth = log_price, estimate = .pred)
 
 template.kagle <- test %>% 
   select(property_id, log_price) %>% 
   mutate(price = exp(log_price)) %>% 
   select(property_id, price) %>% 
   st_drop_geometry()
+
 
 # Exportar a CSV en la carpeta de templates
 write.csv(template.kagle, 
