@@ -68,11 +68,6 @@ variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','p
                           'valor_catastral_vivienda') 
 variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
 
-bd<-bd%>%
-  mutate(inter_transmixsurface=distancia_tm*surface2)%>%
-  mutate(inter_transmixarearesidencial=distancia_tm*area_residencial_manzana)%>%
-  mutate(inter_transmixciclovia=distancia_cycleway*distancia_mall)
-
 variables.interaccion <- colnames(bd)[grep('inter_', colnames(bd))]
 
 formula.boosting       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia, variables.interaccion),collapse ='+'),
