@@ -57,9 +57,11 @@ variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','p
                           'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
                           'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
                           'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
-                          'valor_catastral_vivienda') 
+                          'valor_catastral_vivienda', 'estrato', 'surface_covered_knn', 'surface_total_knn') 
 variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
-formula.lasso       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia),collapse ='+'),
+
+variables.interaccion <- colnames(bd)[grep('inter_', colnames(bd))]
+formula.lasso       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia, variables.interaccion),collapse ='+'),
                                         sep='~'))
 
 bd.seleccion <- bd %>% 

@@ -65,7 +65,7 @@ variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','p
                           'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
                           'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
                           'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
-                          'valor_catastral_vivienda') 
+                          'valor_catastral_vivienda', 'estrato', 'surface_covered_knn', 'surface_total_knn') 
 variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
 
 variables.interaccion <- colnames(bd)[grep('inter_', colnames(bd))]
@@ -74,7 +74,7 @@ formula.boosting       <- as.formula(paste('log_price', paste(c(variables.exogen
                                           sep='~'))
 
 bd.seleccion <- bd %>% 
-  select(-c(setdiff(colnames(bd),c(variables.exogenas, variables.distancia)))) %>% 
+  select(-c(setdiff(colnames(bd),c(variables.exogenas, variables.distancia, variables.interaccion)))) %>% 
   mutate(log_price = bd$log_price)
 bd.seleccion <- as_tibble(bd.seleccion)
 bd.seleccion <- bd.seleccion %>% 
