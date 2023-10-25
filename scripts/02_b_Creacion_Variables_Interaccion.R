@@ -80,6 +80,9 @@ bd<-bd%>%
 #Agregación de la variable surface a través de KNN
 KNN<-read_csv(paste0(stores,'base_datos_kvecinos.csv'))
 
+  bd$surface_total_knn=KNN$surface_total_kv
+  bd$surface_covered_knn =KNN$surface_covered_kv
+
 # Exportar a csv y .RData -------------------------------------------------
 write_csv(bd, file = paste0(stores,'base_datos_tratada.csv'))
 save(bd, geometria.osm, coordenadas.x.centroides, coordenadas.y.centroides, file = paste0(stores,'Datos_limpios.RData'))
