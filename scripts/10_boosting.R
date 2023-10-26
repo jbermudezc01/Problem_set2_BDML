@@ -53,10 +53,10 @@ boost_spec <- boost_tree(
 
 # Tune grid regular para el modelo de boost
 boost_grid <- grid_regular(
-  trees(range = c(100, 130)),
+  trees(range = c(95, 120)),
   tree_depth(range = c(1,1)), # Siempre nos daba el mejor tree_depth 1
-  learn_rate(range = c(0.001, 0.005)),
-  levels = 20
+  learn_rate(range = c(0.001, 0.008)),
+  levels = 40
 )
 
 # Receta  -----------------------------------------------------------------
@@ -65,7 +65,7 @@ variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','p
                           'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
                           'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
                           'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
-                          'valor_catastral_vivienda', 'estrato', 'surface_covered_knn', 'surface_total_knn') 
+                          'valor_catastral_vivienda', 'estrato') 
 variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
 
 variables.interaccion <- colnames(bd)[grep('inter_', colnames(bd))]
