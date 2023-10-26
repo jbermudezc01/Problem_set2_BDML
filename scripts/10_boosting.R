@@ -80,6 +80,7 @@ bd.seleccion <- as_tibble(bd.seleccion)
 bd.seleccion <- bd.seleccion %>% 
   select(-c('geometry'))
 
+
 # Ya podemos añadir las variables necesarias para la estimacion
 receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
   step_poly(all_of(variables.distancia), degree = 3) %>% 
@@ -118,6 +119,16 @@ autoplot(tune_boost)
 # Mejores estimaciones de parametros --------------------------------------
 best_parms_boost <- select_best(tune_boost, metric = "mae")
 best_parms_boost
+
+# crear subset de entrenamiento
+train <-  bd %>%
+  subset(type_data == 'train') %>% 
+  select(c('type_data',colnames(bd.seleccion)))
+
+# crear subset de testeo
+test <- bd %>%
+  subset(type_data == 'test') %>% 
+  select(c('type_data','property_id',colnames(bd.seleccion)))
 
 # Actualizar parametros con finalize_workflow() 
 boost_final <- finalize_workflow(workflow, best_parms_boost)
