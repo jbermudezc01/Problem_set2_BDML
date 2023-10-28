@@ -27,7 +27,9 @@ p_load(tidyverse, # Manipular dataframes
        purrr,
        glmnet,
        webshot,
-       htmlwidgets) 
+       htmlwidgets,
+       geojsonR,
+       geojsonio) 
 
 # Directorios -------------------------------------------------------------
 stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
@@ -90,13 +92,40 @@ mapas <- lapply(names(geometria.osm), function(name){
   webshot(paste0(views, 'html_temp/',name,'.html'), file = paste0(views, 'mapas/',name,'.png'))
 })
 
-# Falta agregar los mapas de la geografia de transmilemio y sitp
+# Falta agregar los mapas de la geografia de transmilemio 
 # Para los datos de transmilenio y SITP se confia en los datos abiertos de transmilenio, y usamos la API que ofrecen ellos en la pagina oficial
 # La API se encuentra en formato geojson por lo que usamos el paquete <geojsonR> y generamos dataframes con las longitudes y latitudes de las estaciones para 
 # luego medir la distancia 
 transmilenio           <- FROM_GeoJson(url_file_string = "https://gis.transmilenio.gov.co/arcgis/rest/services/Troncal/consulta_estaciones_troncales/FeatureServer/1/query?outFields=*&where=1%3D1&f=geojson")
 geometria.transmilenio <- purrr::map_df(transmilenio$features, ~.x$properties[c('nombre_estacion','latitud_estacion','longitud_estacion')])
 
-sitp                   <- FROM_GeoJson(url_file_string = "https://gis.transmilenio.gov.co/arcgis/rest/services/Zonal/consulta_paraderos/MapServer/0/query?outFields=*&where=1%3D1&f=geojson")
-geometria.sitp         <- purrr::map_df(sitp$features, ~.x$properties[c('nombre','latitud','longitud')])
-  
+sitp            <- geojson_read(paste0(stores,'Paraderos_Zonales_del_SITP.geojson'))
+geometria.sitp  <- purrr::map_df(sitp$features, ~.x$properties[c('nombre','latitud','longitud')])
+
+# Mapa transmilenio
+mapa.tm <- leaflet() %>% 
+  addTiles() %>% 
+  setView(lng=longitud_central,lat=latitud_central, zoom =12) %>% 
+  #addPolygons(data = geometria.osm[[name]], col='red', weight = 10,
+  #            opacity = 0.8) %>% 
+  addCircles(lng = geometria.transmilenio$longitud_estacion,
+             lat = geometria.transmilenio$latitud_estacion,
+             col = 'darkblue', opacity = 1, radius = 2, fill = 'darkblue')
+# Guardar el archivo primero en html
+saveWidget(mapa.tm, paste0(views, 'html_temp/transmilenio.html'))
+# Ahora en png
+webshot(paste0(views, 'html_temp/transmilenio.html'), file = paste0(views, 'mapas/transmilenio.png'))
+
+# Mapa sitp
+mapa.sitp <- leaflet() %>% 
+  addTiles() %>% 
+  setView(lng=longitud_central,lat=latitud_central, zoom =12) %>% 
+  #addPolygons(data = geometria.osm[[name]], col='red', weight = 10,
+  #            opacity = 0.8) %>% 
+  addCircles(lng = geometria.sitp$longitud,
+             lat = geometria.sitp$latitud,
+             col = 'darkblue', opacity = 1, radius = 2, fill = 'darkblue')
+# Guardar el archivo primero en html
+saveWidget(mapa.sitp, paste0(views, 'html_temp/sitp.html'))
+# Ahora en png
+webshot(paste0(views, 'html_temp/sitp.html'), file = paste0(views, 'mapas/sitp.png'))
