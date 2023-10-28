@@ -1,5 +1,7 @@
 ##########################################################
-# Modelo lasso
+# MODELO HIBRIDO - LASSO BOOSTING
+# En este codigo vamos a usar lasso en primer lugar para eliminar variables no significativas,
+# posteriormente con las variables restantes se estima el boosting
 # Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
 ##########################################################
 
@@ -126,22 +128,91 @@ lasso_final <- finalize_workflow(lasso_workflow, best_penalty)
 # Ajustar el modelo con los datos de train
 lasso_final_fit <- fit(lasso_final, data = train)
 
-# Este modelo final se puede aplicar al conjunto de datos de prueba para validar el rendimiento
-# Evaluar el modelo de regresión lasso en datos de prueba. Utilizar 'augment' para generar predicciones en datos de prueba y 
-# combinar con las respuestas reales
-augment(lasso_final_fit, new_data = bd.seleccion) %>%
+# Extraer los coeficientes
+coeficientes <- lasso_final_fit %>% extract_fit_parsnip() %>% tidy()
+coeficientes.no.significativos <- coeficientes %>% 
+  filter(estimate == 0)
+
+# Vector de variables no significativas, sacando las localidades
+variables.no.significativas <- coeficientes.no.significativos$term[!grepl('nombre_localidad',coeficientes.no.significativos$term)]
+
+# Hacer seleccion de variables para Boosting ------------------------------
+bd.boosting <- bd.seleccion %>% 
+  select(-c(variables.no.significativas))
+test.boosting  <- test %>% 
+  select(-c(variables.no.significativas))
+train.boosting <- train %>% 
+  select(-c(variables.no.significativas))
+
+# Especificacion modelo boosting ------------------------------------------
+boost_spec <- boost_tree(
+  trees = tune(),
+  tree_depth = tune(),
+  learn_rate = tune()
+) %>%
+  set_mode("regression")  
+
+# Tune grid regular para el modelo de boost
+boost_grid <- grid_regular(
+  trees(range = c(144, 151)),
+  tree_depth(range = c(1,1)), # Siempre nos daba el mejor tree_depth 1
+  learn_rate(range = c(-0.06,-0.059)),
+  levels = 20
+)
+
+# Seleccionar variables de distancia restantes
+variables.distancia.restantes <- setdiff(variables.distancia, variables.no.significativas)
+
+# Ya podemos añadir las variables necesarias para la estimacion
+receta <- recipe(formula = log_price ~ ., data = bd.boosting) %>%
+  step_poly(all_of(variables.distancia.restantes), degree = 3) %>% 
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+# Workflow ----------------------------------------------------------------
+workflow <- workflow() %>%
+  add_recipe(receta) %>%
+  add_model(boost_spec)
+
+# Estimar el modelo -------------------------------------------------------
+tune_boost <- tune_grid(
+  workflow, # specifica un modelo de randomn forest
+  resamples = block_folds, # Usa los pliegues de validación cruzada definidos previamente en block_folds
+  grid = boost_grid, # Especifica una grilla de parámetros a probar en la afinación
+  metrics = metric_set(mae) # Usa el Error Absoluto Medio (MAE) como métrica para evaluar los modelos
+)
+
+# visualizacion los resultados de la busqueda de hiperparametros 
+autoplot(tune_boost)
+
+# Mejores estimaciones de parametros --------------------------------------
+best_parms_boost <- select_best(tune_boost, metric = "mae")
+best_parms_boost
+
+# Actualizar parametros con finalize_workflow() 
+boost_final <- finalize_workflow(workflow, best_parms_boost)
+
+# Ajustar el modelo con los datos de entrenamiento
+boost_final_fit <- fit(boost_final, data = train.boosting)
+
+# predecimos el precio para los datos de test.boosting 
+test.boosting <- test.boosting %>%
+  mutate(log_price = predict(boost_final_fit, new_data = test.boosting)$.pred)
+
+collect_metrics(tune_boost)
+
+augment(boost_final_fit, new_data = bd.boosting) %>%
   mae(truth = log_price, estimate = .pred)
 
-# Predecir el log(precio) para la base test
-test <- test %>%
-  mutate(log_price = predict(lasso_final_fit, new_data = test)$.pred)
-
-template.kagle <- test %>% 
+template.kagle <- test.boosting %>% 
   select(property_id, log_price) %>% 
   mutate(price = exp(log_price)) %>% 
   select(property_id, price) %>% 
   st_drop_geometry()
 
 # Exportar a CSV en la carpeta de templates
-write.csv(template.kagle, file= paste0(templates,'lasso_penalty',round(best_penalty$penalty,4),'.csv'),
+write.csv(template.kagle, file= paste0(templates,'lassoboosting_penalty',round(best_penalty$penalty,4),'_trees',round(best_parms_boost$trees,4),'_depth',round(best_parms_boost$tree_depth,4),
+                                       '_learnrate',round(best_parms_boost$learn_rate,4),'.csv'),
           row.names = F)
