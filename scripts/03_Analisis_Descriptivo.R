@@ -1,24 +1,55 @@
-# Distribucion variables de interes ---------------------------------------
-# Tipo de propiedad
-bd %>% count(property_type)
+##########################################################
+# Analisis descriptivo
+# Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
+##########################################################
 
-# Convertir variable <price> a log para escalar graficos 
-bd <- bd%>%
-  mutate(log_price=log(price))
+# Limpiar environment -----------------------------------------------------
+rm(list = ls())
+cat('\014')
 
-# Resumen de la distibución de la variable escalado a $
-summary(bd$price) %>%
-  as.matrix() %>%
-  as.data.frame()%>%
-  mutate(V1 = scales::dollar(V1))
+# Librerias ---------------------------------------------------------------
+require(pacman)
+p_load(tidyverse, # Manipular dataframes
+       rio, # Importar datos fácilmente
+       plotly, # Gráficos interactivos
+       leaflet, # Mapas interactivos
+       # rgeos, # ya no se encuentra en el CRAN, por buenas practicas no se utilizara
+       units, # unidades
+       sf, # Leer/escribir/manipular datos espaciales
+       osmdata, # Obtener datos de OpenStreetMap (OSM)
+       tidymodels, # Modelado de datos limpios y ordenados
+       randomForest, # Modelos de bosque aleatorio
+       rattle, # Interfaz gráfica para el modelado de datos
+       spatialsample, # Muestreo espacial para modelos de aprendizaje automático
+       xgboost,
+       tmaptools,
+       terra,
+       purrr,
+       glmnet) 
 
-# Histograma estandarizado en $ 
-dist_precio <- ggplot(bd, aes(x = price)) +
-  geom_histogram(fill = "darkblue", alpha = 0.5) +
-  labs(x = "price", y = "Cantidad") +
-  scale_x_log10(labels = scales::dollar)+
-  theme_bw()
-ggplotly(dist_precio)
+# Directorios -------------------------------------------------------------
+stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
+views     <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
+templates <- paste0(getwd(),'/templates/') # Directorio para crear templates
+
+# Cargar base de datos ----------------------------------------------------
+load(paste0(stores,'Datos_limpios.RData'))
+
+
+# Histograma de variables de interes --------------------------------------
+# Del precio
+plot.precio <-bd %>% 
+  dplyr::filter(!is.na(price)) %>% 
+  ggplot(aes(x = price)) +
+  geom_histogram(fill = "darkblue", alpha = 0.5,color='black') +
+  labs(x = "Precio", y = "Frecuencia") +
+  scale_x_continuous(labels = unit_format(unit='',scale=1e-6),
+                     breaks = seq(min(bd$price,na.rm=T),max(bd$price,na.rm=T),by=135000000))+
+  ggtitle("Histograma de los precios (en millones de pesos)")+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5, size = 16))
+# Guardar el grafico en la carpeta <Views>
+ggsave("histograma_precio.png", plot.precio, width = 8, height = 6, units = "in")
 
 # Relación entre precios y el tipo de propiedad 
 ggplot(bd, aes(x = price))+
