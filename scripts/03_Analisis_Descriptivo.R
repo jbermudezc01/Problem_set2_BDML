@@ -70,19 +70,33 @@ histogramas.distancia <- lapply(variables.distancia, function(name){
 # Graficas mapas ----------------------------------------------------------
 # Encontrammos el queremos que sea el centro del mapa  . bd es la base principal
 raw.csv <- read_csv(paste0(stores,"raw_complete_base.csv"))
-latitud_central  <- mean(raw.csv$lat)
-longitud_central <- mean(raw.csv$lon)
+latitud_central  <- as.numeric(quantile(raw.csv$lat, 0.30))
+longitud_central <- as.numeric(quantile(raw.csv$lon, 0.1))
 
 # Iterar a traves de geometria.osm que tiene los poligonos, y coordenadas.x.centroides
 # con coordenadas.y.centroides que tienen las coordenadas de centroides
-plot <- leaflet() %>%
-  addTiles() %>%
-  setView(lng = longitud_central, lat = latitud_central, zoom = 11.6) %>%
-  addPolygons(data = geometria.osm[[3]], col = "red",weight = 10,
-              opacity = 0.8, popup = geometria.osm[[1]]$name) %>%
-  addCircles(lng = coordenadas.x.centroides[[3]], 
-             lat = coordenadas.y.centroides[[3]], 
-             col = "darkblue", opacity = 0.5, radius = 1)
-# Guardar el archivo
-saveWidget(plot, paste0(views,'html_temp/plot.html'))
-webshot(paste0(views,'html_temp/plot.html'), file = "leaflet_map.png",zoom = 2)
+mapas <- lapply(names(geometria.osm), function(name){
+  map <- leaflet() %>% 
+    addTiles() %>% 
+    setView(lng=longitud_central,lat=latitud_central, zoom =12) %>% 
+    #addPolygons(data = geometria.osm[[name]], col='red', weight = 10,
+    #            opacity = 0.8) %>% 
+    addCircles(lng = coordenadas.x.centroides[[name]],
+               lat = coordenadas.y.centroides[[name]],
+               col = 'darkblue', opacity = 1, radius = 2, fill = 'darkblue')
+  # Guardar el archivo primero en html
+  saveWidget(map, paste0(views, 'html_temp/',name,'.html'))
+  # Ahora en png
+  webshot(paste0(views, 'html_temp/',name,'.html'), file = paste0(views, 'mapas/',name,'.png'))
+})
+
+# Falta agregar los mapas de la geografia de transmilemio y sitp
+# Para los datos de transmilenio y SITP se confia en los datos abiertos de transmilenio, y usamos la API que ofrecen ellos en la pagina oficial
+# La API se encuentra en formato geojson por lo que usamos el paquete <geojsonR> y generamos dataframes con las longitudes y latitudes de las estaciones para 
+# luego medir la distancia 
+transmilenio           <- FROM_GeoJson(url_file_string = "https://gis.transmilenio.gov.co/arcgis/rest/services/Troncal/consulta_estaciones_troncales/FeatureServer/1/query?outFields=*&where=1%3D1&f=geojson")
+geometria.transmilenio <- purrr::map_df(transmilenio$features, ~.x$properties[c('nombre_estacion','latitud_estacion','longitud_estacion')])
+
+sitp                   <- FROM_GeoJson(url_file_string = "https://gis.transmilenio.gov.co/arcgis/rest/services/Zonal/consulta_paraderos/MapServer/0/query?outFields=*&where=1%3D1&f=geojson")
+geometria.sitp         <- purrr::map_df(sitp$features, ~.x$properties[c('nombre','latitud','longitud')])
+  
