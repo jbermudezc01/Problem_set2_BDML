@@ -96,7 +96,7 @@ mapas <- lapply(names(geometria.osm), function(name){
 # Para los datos de transmilenio y SITP se confia en los datos abiertos de transmilenio, y usamos la API que ofrecen ellos en la pagina oficial
 # La API se encuentra en formato geojson por lo que usamos el paquete <geojsonR> y generamos dataframes con las longitudes y latitudes de las estaciones para 
 # luego medir la distancia 
-transmilenio           <- FROM_GeoJson(url_file_string = "https://gis.transmilenio.gov.co/arcgis/rest/services/Troncal/consulta_estaciones_troncales/FeatureServer/1/query?outFields=*&where=1%3D1&f=geojson")
+transmilenio           <- geojson_read(paste0(stores,'Estaciones_Troncales_de_TRANSMILENIO.geojson'))
 geometria.transmilenio <- purrr::map_df(transmilenio$features, ~.x$properties[c('nombre_estacion','latitud_estacion','longitud_estacion')])
 
 sitp            <- geojson_read(paste0(stores,'Paraderos_Zonales_del_SITP.geojson'))
