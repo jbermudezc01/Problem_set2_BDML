@@ -155,6 +155,14 @@ leaflet() %>%
              col = "darkblue", opacity = 0.5, radius = 1)
 
 
+
+# Para los datos de transmilenio y SITP se confia en los datos abiertos de transmilenio, y usamos la API que ofrecen ellos en la pagina oficial
+# La API se encuentra en formato geojson por lo que usamos el paquete <geojsonR> y generamos dataframes con las longitudes y latitudes de las estaciones para 
+# luego medir la distancia 
+transmilenio           <- geojson_read(paste0(stores,'Estaciones_Troncales_de_TRANSMILENIO.geojson'))
+geometria.transmilenio <- purrr::map_df(transmilenio$features, ~.x$properties[c('nombre_estacion','latitud_estacion','longitud_estacion')])
+
+
 # Grafica variables distancias --------------------------------------------
 # Distribución de la variable 
 
@@ -201,4 +209,29 @@ distancia_servicios<- ggplot(bd, aes(x = distancia_centro_servicios)) +
   theme_bw()
 ggplotly(distancia_servicios)
 
+# diagrama faceta distancias 
 
+# Seleccionar solo las variables de distancia
+df_distancia <- df %>%
+  ungroup() %>%
+  select(distancia_school, distancia_mall, distancia_bus_station, distancia_cafe, 
+         distancia_park,distancia_cycleway,
+         distancia_restaurant, distancia_sitp, distancia_tm) %>%
+  mutate(across(everything(), as.numeric))
+
+# Convertir los datos a formato largo para facilitar la creación del diagrama de facetas
+df_long <- df_distancia %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Valor")
+
+# Crear el diagrama de facetas
+p <- ggplot(df_long, aes(x = Valor)) +
+  geom_histogram(binwidth = 100, fill = "blue", color = "white") +
+  facet_wrap(~ Variable, scales = "free_x") +
+  theme_minimal() +
+  labs(title = "", x = "Valor", y = "Frecuencia")
+
+# Mostrar el diagrama
+print(p)
+
+
+w
