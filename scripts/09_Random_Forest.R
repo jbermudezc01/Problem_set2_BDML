@@ -1,45 +1,50 @@
-### modelo de predicción: Random forest ##### 
+##########################################################
+# Modelo Random Forest
+# Autores: Juan Pablo Bermudez. Lina Bautista. Esteban Meza. Pharad Sebastian Escobar
+##########################################################
 
-## limpieza y transformación de datos ##
-
-#Limpieza area de trabajo 
-rm(list=ls())
+# Limpiar environment -----------------------------------------------------
+rm(list = ls())
 cat('\014')
 
-# cargar paquetes 
-install.packages("pacman")
-library(pacman)
-# cargar librerias 
+# Librerias ---------------------------------------------------------------
+require(pacman)
 p_load(tidyverse, # Manipular dataframes
        rio, # Importar datos fácilmente
        plotly, # Gráficos interactivos
        leaflet, # Mapas interactivos
-       rgeos, # Calcular centroides de un polígono
+       # rgeos, # ya no se encuentra en el CRAN, por buenas practicas no se utilizara
        units, # unidades
        sf, # Leer/escribir/manipular datos espaciales
        osmdata, # Obtener datos de OpenStreetMap (OSM)
        tidymodels, # Modelado de datos limpios y ordenados
        randomForest, # Modelos de bosque aleatorio
        rattle, # Interfaz gráfica para el modelado de datos
-       spatialsample,
+       spatialsample, # Muestreo espacial para modelos de aprendizaje automático
        xgboost,
-       scals,
-       purr) # Muestreo espacial para modelos de aprendizaje automático
+       tmaptools,
+       terra,
+       purrr,
+       glmnet) 
 
-# cargar base de datos 
+# Directorios -------------------------------------------------------------
+stores    <- paste0(getwd(),'/stores/') # Directorio de base de datos
+views     <- paste0(getwd(),'/views/')  # Directorio para guardar imagenes
+templates <- paste0(getwd(),'/templates/') # Directorio para crear templates
 
-bd <- read.csv('https://raw.githubusercontent.com/jbermudezc01/Problem_set2_BDML/main/stores/base_datos_tratada.csv')
+# Cargar base de datos ----------------------------------------------------
+load(paste0(stores,'Datos_limpios.RData'))
 
 # crear subset de entrenamiento
 train <-  bd %>%
-  subset(type_data == 1)
+  subset(type_data == 'train')
 
 # crear subset de testeo
 test <- bd %>%
-  subset(type_data == 2)
+  subset(type_data == 'test')
 
-# modelo Random Forest 
 
+# Modelo Random Forest ----------------------------------------------------
 # especificar el modelo 
 
 rf_spec<- rand_forest(
@@ -56,13 +61,31 @@ rf_grid<- grid_random(mtry(range = c(4,6)), # El hiperparámetro mtry determina 
                               min_n(range = c(1, 10)), # El hiperparámetro min_n determina el número mínimo de observaciones que debe haber en un nodo para que se produzca una división. En este caso, se están considerando valores entre 1 y 10.
                               trees(range = c(100, 300)), size = 5)# El hiperparámetro trees determina el número de árboles en el bosque. Aquí, se están considerando valores entre 100 y 300 árboles. size determina el núnmero de combinaciones de hiperparametros 
 
-# especificar la receta
+# Receta  -----------------------------------------------------------------
+# Para tener la receta primero necesitamos una formula adecuada
+variables.exogenas  <-  c('rooms','bathrooms','property_type','piso_numerico','parqueadero','terraza',
+                          'ascensor','vigilancia','deposito','cocina_integral','piso_laminado',
+                          'surface2','area_residencial_manzana','valor_catastral_referencia_2022',
+                          'numero_predios_manzana','nombre_localidad','area_construida_residencial_predio',
+                          'valor_catastral_vivienda') 
+variables.distancia <- colnames(bd)[grep('distancia_', colnames(bd))]
+formula.elastic       <- as.formula(paste('log_price', paste(c(variables.exogenas, variables.distancia),collapse ='+'),
+                                          sep='~'))
 
-receta <- recipe(price ~ bathrooms+bedrooms+rooms+property_type+parqueadero+terraza+ascensor+deposito+vigilancia+cocina_integral , data = bd) %>%
+bd.seleccion <- bd %>% 
+  select(-c(setdiff(colnames(bd),c(variables.exogenas, variables.distancia)))) %>% 
+  mutate(log_price = bd$log_price)
+bd.seleccion <- as_tibble(bd.seleccion)
+bd.seleccion <- bd.seleccion %>% 
+  select(-c('geometry'))
+
+# Ya podemos añadir las variables necesarias para la estimacion
+receta <- recipe(formula = log_price ~ ., data = bd.seleccion) %>%
+  step_poly(all_of(variables.distancia), degree = 3) %>% 
   step_novel(all_nominal_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
-  step_zv(all_predictors()) 
-
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
 # especificar el flujo de trabajo
 
 workflow <- workflow() %>%
@@ -86,14 +109,7 @@ block_folds <- spatial_block_cv(train_sf, v = 5)
 # visualización de plieges 
 autoplot(block_folds) # visualización de los plieges 
 
-# excluimos una zona (a), entrenamos las demás ( b,c,d,e) y validamos con (a) 
-
-walk(block_folds$splits, function(x) print(autoplot(x)))
-
 # Crear pliegues para la validación cruzada
-
-df_fold <- vfold_cv(train, v = 5)
-
 # estimar el modelo - long time ....
 
 tune_forest <- tune_grid(
